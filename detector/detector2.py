@@ -361,7 +361,9 @@ def slPoseToWPILib(slPose):
 
 def positionalTrackingModeFromString(string):
     string = string.upper()
-    if (string == "GEN_2" or string == "GEN-2" or string == "GEN2"):
+    if (string == "GEN_3" or string == "GEN-3" or string == "GEN3"):
+        return sl.POSITIONAL_TRACKING_MODE.GEN_3
+    elif (string == "GEN_2" or string == "GEN-2" or string == "GEN2"):
         return sl.POSITIONAL_TRACKING_MODE.GEN_2
     else:
         return sl.POSITIONAL_TRACKING_MODE.GEN_1
@@ -399,7 +401,7 @@ def depthModeFromString(string):
     string = string.upper()
     if (string == "NEURAL_LIGHT"):
         return sl.DEPTH_MODE.NEURAL_LIGHT
-    if (string == "NEURAL"):
+    elif (string == "NEURAL"):
         return sl.DEPTH_MODE.NEURAL
     elif (string == "NEURAL_PLUS"):
         return sl.DEPTH_MODE.NEURAL_PLUS
