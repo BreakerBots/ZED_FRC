@@ -1,4 +1,4 @@
-# ZED SDK - Object Detection
+# BreakerBots - ZED Depth Camera Object Detection For FRC
 
 This sample shows how to detect custom objects using the official Pytorch implementation of YOLOv8 from a ZED camera and ingest them into the ZED SDK to extract 3D informations and tracking for each objects.
 
