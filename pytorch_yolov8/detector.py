@@ -15,6 +15,7 @@ from time import sleep
 import ogl_viewer.viewer as gl
 import cv_viewer.tracking_viewer as cv_viewer
 import ntcore as nt
+import json
 
 lock = Lock()
 run_signal = False
@@ -62,7 +63,7 @@ def detections_to_custom_box(detections, im0):
     return output
 
 
-def torch_thread(weights, img_size, conf_thres=0.4, iou_thres=0.45):
+def torch_thread(weights, img_size, conf_thres, iou_thres):
     global image_net, exit_signal, run_signal, detections
 
     print("Intializing Network...")
@@ -91,7 +92,13 @@ def torch_thread(weights, img_size, conf_thres=0.4, iou_thres=0.45):
 def main():
     global image_net, exit_signal, run_signal, detections
 
-    capture_thread = Thread(target=torch_thread, kwargs={'weights': opt.weights, 'img_size': opt.img_size, "conf_thres": opt.conf_thres})
+    print("Loading Settings...")
+    settingsFile = open(opt.settings)
+    settings = json.load(settingsFile)
+
+
+
+    capture_thread = Thread(target=torch_thread, kwargs={'weights': settings["inference"]["weights"], 'img_size': settings["inference"]["size"], "conf_thres": settings["inference"]["conf_thresh"],  "iou_thres": settings["inference"]["iou_thresh"]})
     capture_thread.start()
 
     print("Initializing Camera...")
@@ -102,18 +109,22 @@ def main():
     if opt.svo is not None:
         input_type.set_from_svo_file(opt.svo)
 
-    visualize = opt.visualize
+    visualize = settings["visualize"]
 
     # Create a InitParameters object and set configuration parameters
     init_params = sl.InitParameters(input_t=input_type, svo_real_time_mode=True)
     init_params.coordinate_units = sl.UNIT.METER
-    init_params.depth_mode = sl.DEPTH_MODE.NEURAL  # QUALITY
-    init_params.camera_resolution = sl.RESOLUTION.HD2K
+    init_params.depth_mode = depthModeFromString(settings["depth"]["mode"])
+    init_params.camera_resolution = resolutionFromString(settings["camera"]["resolution"])
+    init_params.camera_fps = settings["camera"]["fps"]
     init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
-    init_params.depth_maximum_distance = 50
+    init_params.depth_maximum_distance = settings["depth"]["max_dist"]
+    init_params.depth_minimum_distance = settings["depth"]["min_dist"]
     init_params.sdk_verbose = 1
 
     runtime_params = sl.RuntimeParameters()
+    runtime_params.confidence_threshold = settings['depth']["depth_conf_thresh"]
+    runtime_params.texture_confidence_threshold = settings['depth']["texture_conf_thresh"]
     status = zed.open(init_params)
 
     if status != sl.ERROR_CODE.SUCCESS:
@@ -121,8 +132,9 @@ def main():
         exit()
 
     image_left_tmp = sl.Mat()
+    setCameraVideoSettings(zed, settings)
 
-    print("Initialized Camera")
+    print("Initialized Camera")  
 
     positional_tracking_parameters = sl.PositionalTrackingParameters()
     # If the camera is static, uncomment the following line to have better performances and boxes sticked to the ground.
@@ -141,10 +153,13 @@ def main():
     camera_infos = zed.get_camera_information()
     camera_res = camera_infos.camera_configuration.resolution
     # Create OpenGL viewer
-    viewer = gl.GLViewer()
+    
     point_cloud_res = sl.Resolution(min(camera_res.width, 720), min(camera_res.height, 404))
     point_cloud_render = sl.Mat()
-    viewer.init(camera_infos.camera_model, point_cloud_res, obj_param.enable_tracking)
+    viewer = None
+    if (visualize):
+        viewer = gl.GLViewer()
+        viewer.init(camera_infos.camera_model, point_cloud_res, obj_param.enable_tracking)
     point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
     image_left = sl.Mat()
     # Utilities for 2D display
@@ -155,71 +170,142 @@ def main():
     # Utilities for tracks view
     camera_config = camera_infos.camera_configuration
     tracks_resolution = sl.Resolution(400, display_resolution.height)
-    track_view_generator = cv_viewer.TrackingViewer(tracks_resolution, camera_config.fps, init_params.depth_maximum_distance)
-    track_view_generator.set_camera_calibration(camera_config.calibration_parameters)
+    track_view_generator = None
+    if (visualize):
+        track_view_generator = cv_viewer.TrackingViewer(tracks_resolution, camera_config.fps, init_params.depth_maximum_distance)
+        track_view_generator.set_camera_calibration(camera_config.calibration_parameters)
     image_track_ocv = np.zeros((tracks_resolution.height, tracks_resolution.width, 4), np.uint8)
     # Camera pose
     cam_w_pose = sl.Pose()
+    try:
+        while (not visualize or viewer.is_available()) and not exit_signal:
+            if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
+                # -- Get the image
+                lock.acquire()
+                zed.retrieve_image(image_left_tmp, sl.VIEW.LEFT)
+                image_net = image_left_tmp.get_data()
+                lock.release()
+                run_signal = True
 
-    while viewer.is_available() and not exit_signal:
-        if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
-            # -- Get the image
-            lock.acquire()
-            zed.retrieve_image(image_left_tmp, sl.VIEW.LEFT)
-            image_net = image_left_tmp.get_data()
-            lock.release()
-            run_signal = True
+                # -- Detection running on the other thread
+                while run_signal:
+                    sleep(0.001)
 
-            # -- Detection running on the other thread
-            while run_signal:
-                sleep(0.001)
+                # Wait for detections
+                lock.acquire()
+                # -- Ingest detections
+                zed.ingest_custom_box_objects(detections)
+                lock.release()
+                zed.retrieve_objects(objects, obj_runtime_param)
 
-            # Wait for detections
-            lock.acquire()
-            # -- Ingest detections
-            zed.ingest_custom_box_objects(detections)
-            lock.release()
-            zed.retrieve_objects(objects, obj_runtime_param)
+                if (visualize):
+                    # -- Display
+                    # Retrieve display data
+                    zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, point_cloud_res)
+                    point_cloud.copy_to(point_cloud_render)
+                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
+                    zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
 
-            if (visualize):
-                 # -- Display
-                # Retrieve display data
-                zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, point_cloud_res)
-                point_cloud.copy_to(point_cloud_render)
-                zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
-                zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
+                    # 3D rendering
+                    viewer.updateData(point_cloud_render, objects)
+                    # 2D rendering
+                    np.copyto(image_left_ocv, image_left.get_data())
+                    cv_viewer.render_2D(image_left_ocv, image_scale, objects, obj_param.enable_tracking)
+                    global_image = cv2.hconcat([image_left_ocv, image_track_ocv])
+                    # Tracking view
+                    track_view_generator.generate_view(objects, cam_w_pose, image_track_ocv, objects.is_tracked)
 
-                # 3D rendering
-                viewer.updateData(point_cloud_render, objects)
-                # 2D rendering
-                np.copyto(image_left_ocv, image_left.get_data())
-                cv_viewer.render_2D(image_left_ocv, image_scale, objects, obj_param.enable_tracking)
-                global_image = cv2.hconcat([image_left_ocv, image_track_ocv])
-                # Tracking view
-                track_view_generator.generate_view(objects, cam_w_pose, image_track_ocv, objects.is_tracked)
-
-                cv2.imshow("ZED | 2D View and Birds View", global_image)
-           
-            key = cv2.waitKey(10)
-            if key == 27:
+                    cv2.imshow("ZED | 2D View and Birds View", global_image)
+            
+                    key = cv2.waitKey(10)
+                    if key == 27:
+                        exit_signal = True
+            else:
                 exit_signal = True
-        else:
-            exit_signal = True
 
-    viewer.exit()
-    exit_signal = True
-    zed.close()
+        if (visualize):
+            viewer.exit()
+        exit_signal = True
+        zed.close()
+    except KeyboardInterrupt:
+        if (visualize):
+            viewer.exit()
+        exit_signal = True
+        zed.close()
+
+def depthModeFromString(string):
+    string = string.upper()
+    if (string == "NEURAL"):
+        return sl.DEPTH_MODE.NEURAL
+    elif (string == "NEURAL_PLUS"):
+        return sl.DEPTH_MODE.NEURAL_PLUS
+    elif (string == "PERFORMANCE"):
+        return sl.DEPTH_MODE.PERFORMANCE
+    elif (string == "QUALITY"):
+        return sl.DEPTH_MODE.QUALITY
+    else:
+        return sl.DEPTH_MODE.ULTRA
+    
+def resolutionFromString(string):
+    string = string.upper()
+    if (string == "HD2K"):
+        return sl.RESOLUTION.HD2K
+    elif (string == "HD1080"):
+        return sl.RESOLUTION.HD1080
+    elif (string == "HD1200"):
+        return sl.RESOLUTION.HD1200
+    elif (string == "HD720"):
+        return sl.RESOLUTION.HD720
+    elif (string == "SVGA"):
+        return sl.RESOLUTION.SVGA
+    elif (string == "VGA"):
+        return sl.RESOLUTION.VGA
+    else:
+        return sl.RESOLUTION.AUTO
+
+def setCameraVideoSettings(camera, settings):
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.BRIGHTNESS, settings["camera"]["brightness"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.CONTRAST, settings["camera"]["contrast"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.HUE, settings["camera"]["hue"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.SATURATION, settings["camera"]["saturation"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.SHARPNESS, settings["camera"]["sharpness"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.GAMMA, settings["camera"]["gamma"])
+    exp = settings["camera"]["exposure"]
+    gain = settings["camera"]["gain"]
+    if (exp < 0 or gain < 0):
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.AEC_AGC, 1)
+    else:
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, settings["camera"]["exposure"])
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.GAIN, settings["camera"]["gain"])
+    wb = settings["camera"]['wb']
+    if (wb < 2800 or wb > 6500):
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_AUTO, 1)
+    else:
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE, wb)
+    return
 
 ntInst = nt.NetworkTableInstance.getDefault()
 ntInst.startClient4("ZED")
 ntInst.setServerTeam(5104)
 ntInst.startDSClient()
 table = ntInst.getTable("ZED_detections")
-idPub = table.getIntegerArrayTopic("IDs").publish()
-labelPub = table.getStringArrayTopic("labels").publish()
+idPub = table.getIntegerArrayTopic("id").publish()
+labelPub = table.getStringArrayTopic("label").publish()
 latencyPub = table.getIntegerTopic("pipeline_latency").publish()
-xVelPub = table.getDoubleArrayTopic("x_vel") 
-def publishNT(objects):
+xVelPub = table.getDoubleArrayTopic("x_vel").publish()
+yVelPub = table.getDoubleArrayTopic("y_vel").publish() 
+yVelPub = table.getDoubleArrayTopic("y_vel").publish()
+xVelPub = table.getDoubleArrayTopic("x").publish()
+yVelPub = table.getDoubleArrayTopic("y").publish() 
+yVelPub = table.getDoubleArrayTopic("y").publish()
+boxLenPub = table.getDoubleArrayTopic("box_l").publish()
+boxWidthPub = table.getDoubleArrayTopic("box_w").publish() 
+boxHeightPub = table.getDoubleArrayTopic("box_h").publish() 
+confPub = table.getDoubleArrayTopic("conf").publish() 
+isVisPub = table.getBooleanArrayTopic("is_visible").publish()
+isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
+
+def publishNT(objects, lables):
     xArr = []
     yArr = []
     zArr = []
@@ -229,18 +315,15 @@ def publishNT(objects):
     objList = objects.object_list
     numObjs = len(objList)
     for x in range(numObjs):
-        
-        
+        obj = objList[x]
 
     return
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default="C:/Users/rrcab/Downloads/FRC2024m.pt", help='model.pt path(s)')#'C:/Users/rrcab/Downloads/FRC2024m.pt'
-    parser.add_argument('--visualize', type=bool, default=True, help='model.pt path(s)')
+    parser.add_argument('--settings', type=str, default="settings.json", help='settings.json path')
     parser.add_argument('--svo', type=str, default=None, help='optional svo file')
-    parser.add_argument('--img_size', type=int, default=640, help='inference size (pixels)')
-    parser.add_argument('--conf_thres', type=float, default=0.2, help='object confidence threshold')
     opt = parser.parse_args()
 
     with torch.no_grad():
