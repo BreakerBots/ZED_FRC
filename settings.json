@@ -9,12 +9,12 @@
         "saturation":4,
         "sharpness":4,
         "gamma":5,
-        "gain":-1,
+        "gain": -1,
         "exposure": -1,
         "wb": -1
     },
     "depth": {
-        "mode": "NEURAL_PLUS",
+        "mode": "NEURAL",
         "stabilization": 0,
         "depth_conf_thresh": 100,
         "texture_conf_thresh": 100,
@@ -26,7 +26,7 @@
         "name":"ZED"
     },
     "inference": {
-        "weights": "C:/Users/rrcab/Downloads/FRC2024m.pt",
+        "weights": "models/FRC2024_multiclass_YOLOv8m.pt",
         "size": 640,
         "conf_thresh": 0.1,
         "iou_thresh": 0.45,

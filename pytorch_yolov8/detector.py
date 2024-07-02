@@ -217,9 +217,9 @@ def main():
 
                     cv2.imshow("ZED | 2D View and Birds View", global_image)
             
-                    key = cv2.waitKey(10)
-                    if key == 27:
-                        exit_signal = True
+                key = cv2.waitKey(10)
+                if key == 27:
+                    exit_signal = True
             else:
                 exit_signal = True
 
