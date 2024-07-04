@@ -6,7 +6,7 @@
         "brightness":4,
         "contrast":4,
         "hue": 0,
-        "saturation":4,
+        "saturation":3,
         "sharpness":4,
         "gamma":5,
         "gain": -1,
@@ -26,10 +26,10 @@
         "name":"ZED"
     },
     "inference": {
-        "weights": "models/FRC2024_multiclass_YOLOv8m.pt",
+        "weights": "models/FRC2024_note_only_YOLOv8l.pt",
         "size": 640,
-        "conf_thresh": 0.1,
-        "iou_thresh": 0.45,
+        "conf_thresh": 0.15,
+        "iou_thresh": 0.25,
         "labels": [
             "note",
             "crescendo_logo",

@@ -296,9 +296,9 @@ latencyPub = table.getIntegerTopic("pipeline_latency").publish()
 xVelPub = table.getDoubleArrayTopic("x_vel").publish()
 yVelPub = table.getDoubleArrayTopic("y_vel").publish() 
 yVelPub = table.getDoubleArrayTopic("y_vel").publish()
-xVelPub = table.getDoubleArrayTopic("x").publish()
-yVelPub = table.getDoubleArrayTopic("y").publish() 
-yVelPub = table.getDoubleArrayTopic("y").publish()
+xPub = table.getDoubleArrayTopic("x").publish()
+yPub = table.getDoubleArrayTopic("y").publish() 
+yPub = table.getDoubleArrayTopic("y").publish()
 boxLenPub = table.getDoubleArrayTopic("box_l").publish()
 boxWidthPub = table.getDoubleArrayTopic("box_w").publish() 
 boxHeightPub = table.getDoubleArrayTopic("box_h").publish() 
@@ -312,11 +312,35 @@ def publishNT(objects, lables):
     zArr = []
     xVelArr = []
     yVelArr = []
-    
+    zVelArr = []
+    idArr = []
+    labelArr = []
+    bLenArr = []
+    bHeightArr = []
+    bWidthArr = []
+    confArr = []
+    isVisArr = []
+    isMovArr = []
+
     objList = objects.object_list
     numObjs = len(objList)
     for x in range(numObjs):
         obj = objList[x]
+        idArr[x] = obj.id()
+        confArr[x] = obj.confidence()
+        # labelArr[x] = obj.
+        pos = obj.position()
+        xArr[x] = pos[0]
+        yArr[x] = pos[1]
+        zArr[x] = pos[2]
+        vel = obj.velocity()
+        xVelArr[x] = vel[0]
+        yVelArr[x] = vel[1]
+        zVelArr[x] = vel[2]
+        
+        
+
+
 
     return
 
