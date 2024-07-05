@@ -24,7 +24,7 @@ pip install ultralytics
 
 ## Run the program
 
-*NOTE: The ZED v1 is not compatible with this module*
+*NOTE: The ZED v1 is not compatible with this program*
 
 ```
 python detector.py --settings settings.json # [--svo path/to/file.svo]
@@ -33,7 +33,3 @@ python detector.py --settings settings.json # [--svo path/to/file.svo]
 ## Training your own model
 
 This program can use any model trained with YOLOv8, including custom trained one. For a getting started on how to trained a model on a custom dataset with YOLOv5, see here https://docs.ultralytics.com/tutorials/train-custom-datasets/
-
-## Support
-
-If you need assistance go to our Community site at https://community.stereolabs.com/

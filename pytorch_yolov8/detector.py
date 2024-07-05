@@ -21,6 +21,29 @@ lock = Lock()
 run_signal = False
 exit_signal = False
 
+ntInst = nt.NetworkTableInstance.getDefault()
+ntInst.startClient4("ZED")
+ntInst.setServerTeam(5104)
+ntInst.startDSClient()
+table = ntInst.getTable("ZED_detections")
+heartbeatPub = table.getIntegerTopic("heartbeat").publish()
+idPub = table.getIntegerArrayTopic("id").publish()
+labelPub = table.getStringArrayTopic("label").publish()
+latencyPub = table.getIntegerTopic("pipeline_latency").publish()
+xVelPub = table.getDoubleArrayTopic("x_vel").publish()
+yVelPub = table.getDoubleArrayTopic("y_vel").publish() 
+zVelPub = table.getDoubleArrayTopic("z_vel").publish()
+xPub = table.getDoubleArrayTopic("x").publish()
+yPub = table.getDoubleArrayTopic("y").publish() 
+zPub = table.getDoubleArrayTopic("z").publish()
+boxLenPub = table.getDoubleArrayTopic("box_l").publish()
+boxWidthPub = table.getDoubleArrayTopic("box_w").publish() 
+boxHeightPub = table.getDoubleArrayTopic("box_h").publish() 
+confPub = table.getDoubleArrayTopic("conf").publish() 
+isVisPub = table.getBooleanArrayTopic("is_visible").publish()
+isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
+ntHeartbeat = 0
+
 
 def xywh2abcd(xywh, im_shape):
     output = np.zeros((4, 2))
@@ -110,6 +133,7 @@ def main():
         input_type.set_from_svo_file(opt.svo)
 
     visualize = settings["visualize"]
+    publish = settings["networktables"]["publish"]
 
     # Create a InitParameters object and set configuration parameters
     init_params = sl.InitParameters(input_t=input_type, svo_real_time_mode=True)
@@ -198,6 +222,9 @@ def main():
                 lock.release()
                 zed.retrieve_objects(objects, obj_runtime_param)
 
+                if (publish):
+                    publishNT(zed, objects)
+
                 if (visualize):
                     # -- Display
                     # Retrieve display data
@@ -284,29 +311,8 @@ def setCameraVideoSettings(camera, settings):
         camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE, wb)
     return
 
-ntInst = nt.NetworkTableInstance.getDefault()
-ntInst.startClient4("ZED")
-ntInst.setServerTeam(5104)
-ntInst.startDSClient()
-table = ntInst.getTable("ZED_detections")
-heartbeatPub = table.getIntegerTopic("heartbeat").publish()
-idPub = table.getIntegerArrayTopic("id").publish()
-labelPub = table.getStringArrayTopic("label").publish()
-latencyPub = table.getIntegerTopic("pipeline_latency").publish()
-xVelPub = table.getDoubleArrayTopic("x_vel").publish()
-yVelPub = table.getDoubleArrayTopic("y_vel").publish() 
-yVelPub = table.getDoubleArrayTopic("y_vel").publish()
-xPub = table.getDoubleArrayTopic("x").publish()
-yPub = table.getDoubleArrayTopic("y").publish() 
-yPub = table.getDoubleArrayTopic("y").publish()
-boxLenPub = table.getDoubleArrayTopic("box_l").publish()
-boxWidthPub = table.getDoubleArrayTopic("box_w").publish() 
-boxHeightPub = table.getDoubleArrayTopic("box_h").publish() 
-confPub = table.getDoubleArrayTopic("conf").publish() 
-isVisPub = table.getBooleanArrayTopic("is_visible").publish()
-isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
-
-def publishNT(objects, lables):
+def publishNT(camera, objects):
+    global ntHeartbeat
     xArr = []
     yArr = []
     zArr = []
@@ -322,21 +328,37 @@ def publishNT(objects, lables):
     isVisArr = []
     isMovArr = []
 
+    heartbeatPub.set(ntHeartbeat)
+    ntHeartbeat+=1
+    latencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - objects.timestamp.get_nanoseconds())
+
     objList = objects.object_list
-    numObjs = len(objList)
-    for x in range(numObjs):
-        obj = objList[x]
-        idArr[x] = obj.id()
-        confArr[x] = obj.confidence()
+    numObjs = __builtins__.len(objList)
+    for obj in objList:
+        idArr.append(obj.id)
+        confArr.append(obj.confidence)
+        isVisArr.append(obj.tracking_state == sl.OBJECT_TRACKING_STATE.OK)
+        isMovArr.append(obj.action_state == sl.OBJECT_ACTION_STATE.MOVING)
         # labelArr[x] = obj.
-        pos = obj.position()
-        xArr[x] = pos[0]
-        yArr[x] = pos[1]
-        zArr[x] = pos[2]
-        vel = obj.velocity()
-        xVelArr[x] = vel[0]
-        yVelArr[x] = vel[1]
-        zVelArr[x] = vel[2]
+        pos = obj.position
+        xArr.append(pos[0])
+        yArr.append(pos[1])
+        zArr.append(pos[2])
+        vel = obj.velocity
+        xVelArr.append(vel[0])
+        yVelArr.append(vel[1])
+        zVelArr.append(vel[2])
+        dims = obj.dimensions
+        bWidthArr.append(dims[0])
+        bHeightArr.append(dims[1])
+        bLenArr.append(dims[2])
+
+    
+   
+    xPub.set(xArr)
+    yPub.set(yArr)
+    zPub.set(zArr)
+
         
         
 
