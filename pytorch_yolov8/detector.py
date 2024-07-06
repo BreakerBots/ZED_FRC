@@ -94,7 +94,7 @@ def torch_thread(weights, img_size, conf_thres, iou_thres):
     torch.cuda.set_device(0)
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = YOLO(weights, task='detect')
+    model = YOLO(weights, task='detect', verbose=False)
     model.to(device=device)
 
     while not exit_signal:
@@ -353,17 +353,19 @@ def publishNT(camera, objects):
         bHeightArr.append(dims[1])
         bLenArr.append(dims[2])
 
-    
-   
+    idPub.set(idArr)
+    confPub.set(confArr)
+    isVisPub.set(isVisArr)
+    isMovingPub.set(isMovArr)
     xPub.set(xArr)
     yPub.set(yArr)
     zPub.set(zArr)
-
-        
-        
-
-
-
+    xVelPub.set(xVelArr)
+    yVelPub.set(yVelArr)
+    zVelPub.set(zVelArr)
+    boxLenPub.set(bLenArr)
+    boxHeightPub.set(bHeightArr)
+    boxWidthPub.set(bWidthArr)
     return
 
 

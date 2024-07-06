@@ -2,7 +2,7 @@
     "visualize": true,
     "camera": {
         "resolution":"HD1080",
-        "fps":0,
+        "fps": 0,
         "brightness":4,
         "contrast":4,
         "hue": 0,
@@ -30,7 +30,7 @@
         "weights": "models/dataset_colab_noro2024_YOLOv8n.pt",
         "size": 640,
         "conf_thresh": 0.15,
-        "iou_thresh": 0.25,
+        "iou_thresh": 0.45,
         "labels": [
             "note",
             "crescendo_logo",
