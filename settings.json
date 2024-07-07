@@ -1,7 +1,7 @@
 {
     "visualize": true,
     "camera": {
-        "resolution":"HD720",
+        "resolution":"SVGA",
         "fps": 30,
         "brightness":4,
         "contrast":4,
@@ -30,87 +30,15 @@
         "weights": "models/dataset_colab_noro2024_YOLOv8n.pt",
         "size": 640,
         "det_conf_thresh": 0.0005,
-        "iou_thresh": 0.1,
+        "iou_thresh": 0.05,
         "classes": [
             {
-                "label":"note",
-                "conf_thresh":0.65
+                "label":"robot",
+                "conf_thresh":0.7
             },
             {
-                "label": "crescendo_logo",
-                "conf_thresh":0.0005
-            },
-            {
-                "label":"blue_triangle_text",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"red_triangle_text",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"blue_tape_to_wall",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"red_tape_to_wall",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"white_tape_to_wall",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"red_tape_corner",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"blue_tape_corner",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"blue_ds_light",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"red_ds_light",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"blue_ds_number",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"red_ds_number",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"blue_robot",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"red_robot",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"green_crescendo_logo",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"red_podium",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"blue_robot",
-                "conf_thresh":0.1
-            },
-            {
-                "label":"high_note",
-                "conf_thresh":0.1
-            },
-            {
-                "label": "ds_light",
-                "conf_thresh":0.1
+                "label": "note",
+                "conf_thresh":0.007
             }
         ]
     }

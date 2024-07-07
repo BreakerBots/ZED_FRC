@@ -225,7 +225,7 @@ def main():
                 zed.retrieve_objects(objects, obj_runtime_param)
 
                 if (publish):
-                    publishNT(zed, objects)
+                    publishNT(zed, objects, classes)
 
                 if (visualize):
                     # -- Display
@@ -239,7 +239,7 @@ def main():
                     viewer.updateData(point_cloud_render, objects)
                     # 2D rendering
                     np.copyto(image_left_ocv, image_left.get_data())
-                    cv_viewer.render_2D(image_left_ocv, image_scale, objects, obj_param.enable_tracking)
+                    cv_viewer.render_2D(image_left_ocv, image_scale, objects, obj_param.enable_tracking, classes)
                     global_image = cv2.hconcat([image_left_ocv, image_track_ocv])
                     # Tracking view
                     track_view_generator.generate_view(objects, cam_w_pose, image_track_ocv, objects.is_tracked)
@@ -314,7 +314,7 @@ def setCameraVideoSettings(camera, settings):
         camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE, wb)
     return
 
-def publishNT(camera, objects):
+def publishNT(camera, objects, classes):
     global ntHeartbeat
     xArr = []
     yArr = []
@@ -339,10 +339,10 @@ def publishNT(camera, objects):
     numObjs = __builtins__.len(objList)
     for obj in objList:
         idArr.append(obj.id)
-        confArr.append(obj.confidence)
+        confArr.append(obj.confidence/100.0)
         isVisArr.append(obj.tracking_state == sl.OBJECT_TRACKING_STATE.OK)
         isMovArr.append(obj.action_state == sl.OBJECT_ACTION_STATE.MOVING)
-        labelArr.append(str(obj.raw_label))
+        labelArr.append(classes[obj.raw_label]["label"])
         pos = obj.position
         xArr.append(pos[0])
         yArr.append(pos[1])

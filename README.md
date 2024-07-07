@@ -8,8 +8,9 @@ This is the co-processor side backend program to control a StereoLabs ZED depth 
     - 3D bounding boxes around detected objects are drawn
  - Easy configuration through JSON file
     - Set inference parameters, NN weight filepaths, camera video settings, depth calculation settings, and more
+    - Ability to set per-class filtering parameters
  - End-to-end CUDA acceleration
- - Integraated NT publishing for FRC
+ - Integrated NT publishing for FRC
     - Robot API available [HERE]() (WIP)
 
 ## Getting Started
