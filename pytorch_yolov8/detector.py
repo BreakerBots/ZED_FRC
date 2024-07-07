@@ -71,22 +71,24 @@ def xywh2abcd(xywh, im_shape):
     output[3][1] = y_max
     return output
 
-def detections_to_custom_box(detections, im0):
+def detections_to_custom_box(detections, im0, classes):
     output = []
     for i, det in enumerate(detections):
-        xywh = det.xywh[0]
-
-        # Creating ingestable objects for the ZED SDK
-        obj = sl.CustomBoxObjectData()
-        obj.bounding_box_2d = xywh2abcd(xywh, im0.shape)
-        obj.label = det.cls
-        obj.probability = det.conf
-        obj.is_grounded = False
-        output.append(obj)
+        conf = det.conf
+        cls = det.cls
+        if (conf >= classes[int(cls)]["conf_thresh"]):
+            xywh = det.xywh[0]
+            # Creating ingestable objects for the ZED SDK
+            obj = sl.CustomBoxObjectData()
+            obj.bounding_box_2d = xywh2abcd(xywh, im0.shape)
+            obj.label = cls
+            obj.probability = conf
+            obj.is_grounded = False
+            output.append(obj)
     return output
 
 
-def torch_thread(weights, img_size, conf_thres, iou_thres):
+def torch_thread(weights, img_size, conf_thres, iou_thres, classes):
     global image_net, exit_signal, run_signal, detections
 
     print("Intializing Network...")
@@ -106,7 +108,7 @@ def torch_thread(weights, img_size, conf_thres, iou_thres):
             det = model.predict(img, save=False, imgsz=img_size, conf=conf_thres, iou=iou_thres)[0].boxes
 
             # ZED CustomBox format (with inverse letterboxing tf applied)
-            detections = detections_to_custom_box(det, image_net)
+            detections = detections_to_custom_box(det, image_net, classes)
             lock.release()
             run_signal = False
         sleep(0.01)
@@ -119,9 +121,9 @@ def main():
     settingsFile = open(opt.settings)
     settings = json.load(settingsFile)
 
+    classes = settings["inference"]["classes"]
 
-
-    capture_thread = Thread(target=torch_thread, kwargs={'weights': settings["inference"]["weights"], 'img_size': settings["inference"]["size"], "conf_thres": settings["inference"]["conf_thresh"],  "iou_thres": settings["inference"]["iou_thresh"]})
+    capture_thread = Thread(target=torch_thread, kwargs={'weights': settings["inference"]["weights"], 'img_size': settings["inference"]["size"], "conf_thres": settings["inference"]["det_conf_thresh"],  "iou_thres": settings["inference"]["iou_thresh"], "classes": classes})
     capture_thread.start()
 
     print("Initializing Camera...")
@@ -260,6 +262,7 @@ def main():
         exit_signal = True
         zed.close()
 
+
 def depthModeFromString(string):
     string = string.upper()
     if (string == "NEURAL"):
@@ -339,7 +342,7 @@ def publishNT(camera, objects):
         confArr.append(obj.confidence)
         isVisArr.append(obj.tracking_state == sl.OBJECT_TRACKING_STATE.OK)
         isMovArr.append(obj.action_state == sl.OBJECT_ACTION_STATE.MOVING)
-        # labelArr[x] = obj.
+        labelArr.append(str(obj.raw_label))
         pos = obj.position
         xArr.append(pos[0])
         yArr.append(pos[1])
@@ -353,6 +356,7 @@ def publishNT(camera, objects):
         bHeightArr.append(dims[1])
         bLenArr.append(dims[2])
 
+    labelPub.set(labelArr)
     idPub.set(idArr)
     confPub.set(confArr)
     isVisPub.set(isVisArr)
