@@ -282,12 +282,12 @@ def resolutionFromString(string):
         return sl.RESOLUTION.HD2K
     elif (string == "HD1080"):
         return sl.RESOLUTION.HD1080
-    elif (string == "HD1200"):
-        return sl.RESOLUTION.HD1200
+    # elif (string == "HD1200"):
+    #     return sl.RESOLUTION.HD1200
     elif (string == "HD720"):
         return sl.RESOLUTION.HD720
-    elif (string == "SVGA"):
-        return sl.RESOLUTION.SVGA
+    # elif (string == "SVGA"):
+    #     return sl.RESOLUTION.SVGA
     elif (string == "VGA"):
         return sl.RESOLUTION.VGA
     else:

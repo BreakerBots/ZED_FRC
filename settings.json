@@ -1,7 +1,7 @@
 {
     "visualize": true,
     "camera": {
-        "resolution":"SVGA",
+        "resolution":"HD1080",
         "fps": 30,
         "brightness":4,
         "contrast":4,
@@ -27,18 +27,18 @@
         "name":"ZED"
     },
     "inference": {
-        "weights": "models/dataset_colab_noro2024_YOLOv8n.pt",
+        "weights": "models/dataset_colab_noro2024_YOLOv8n_last.pt",
         "size": 640,
         "det_conf_thresh": 0.0005,
-        "iou_thresh": 0.05,
+        "iou_thresh": 0.2,
         "classes": [
             {
                 "label":"robot",
-                "conf_thresh":0.7
+                "conf_thresh":0.45
             },
             {
                 "label": "note",
-                "conf_thresh":0.007
+                "conf_thresh":0.002
             }
         ]
     }
