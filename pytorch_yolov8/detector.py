@@ -105,7 +105,7 @@ def torch_thread(weights, img_size, conf_thres, iou_thres, classes):
 
             img = cv2.cvtColor(image_net, cv2.COLOR_BGRA2RGB)
             # https://docs.ultralytics.com/modes/predict/#video-suffixes
-            det = model.predict(img, save=False, imgsz=img_size, conf=conf_thres, iou=iou_thres)[0].boxes
+            det = model.predict(img, save=False, imgsz=img_size, conf=conf_thres, iou=iou_thres, agnostic_nms=True)[0].boxes
 
             # ZED CustomBox format (with inverse letterboxing tf applied)
             detections = detections_to_custom_box(det, image_net, classes)

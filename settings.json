@@ -27,18 +27,18 @@
         "name":"ZED"
     },
     "inference": {
-        "weights": "models/dataset_colab_noro2024_YOLOv8n_last.pt",
+        "weights": "models/BreakerBots_noro2024_YOLOv8m.pt",
         "size": 640,
-        "det_conf_thresh": 0.0005,
-        "iou_thresh": 0.2,
+        "det_conf_thresh": 0.0035,
+        "iou_thresh": 0.5,
         "classes": [
             {
-                "label":"robot",
-                "conf_thresh":0.45
+                "label":"note",
+                "conf_thresh":0.006
             },
             {
-                "label": "note",
-                "conf_thresh":0.002
+                "label": "robot",
+                "conf_thresh":0.0035
             }
         ]
     }
