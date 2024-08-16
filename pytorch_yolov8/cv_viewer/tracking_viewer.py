@@ -68,7 +68,7 @@ def render_2D(left_display, img_scale, objects, is_tracking_on, classes):
 
             # Diplay Object distance to camera as text
             if np.isfinite(obj.position[2]):
-                text = "X: " + str(round(abs(obj.position[0]), 1)) + ", Y: " + str(round(abs(obj.position[1]), 1)) + ", Z: " + str(round(abs(obj.position[2]), 1))
+                text = "X: " + str(round(abs(obj.position[0]), 1)) + ", Y: " + str(round(abs(obj.position[1]), 1)) + ", Z: " + str(round(abs(obj.position[2]), 1)) + ", C: " + str(obj.confidence)
                 text_position = (int(position_image[0] - 20), int(position_image[1]))
                 cv2.putText(left_display, text, text_position, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, text_color, 1)
 

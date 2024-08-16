@@ -88,7 +88,7 @@ def detections_to_custom_box(detections, im0, classes):
     return output
 
 
-def torch_thread(weights, img_size, conf_thres, iou_thres, classes):
+def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, classes):
     global image_net, exit_signal, run_signal, detections
 
     print("Intializing Network...")
@@ -97,7 +97,7 @@ def torch_thread(weights, img_size, conf_thres, iou_thres, classes):
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = YOLO(weights, task='detect', verbose=False)
-    model.to(device=device)
+
 
     while not exit_signal:
         if run_signal:
@@ -105,7 +105,7 @@ def torch_thread(weights, img_size, conf_thres, iou_thres, classes):
 
             img = cv2.cvtColor(image_net, cv2.COLOR_BGRA2RGB)
             # https://docs.ultralytics.com/modes/predict/#video-suffixes
-            det = model.predict(img, save=False, imgsz=img_size, conf=conf_thres, iou=iou_thres, agnostic_nms=True)[0].boxes
+            det = model.predict(img, save=False, imgsz=img_size, conf=conf_thres, iou=iou_thres, agnostic_nms=agnostic_nms, device=device)[0].boxes
 
             # ZED CustomBox format (with inverse letterboxing tf applied)
             detections = detections_to_custom_box(det, image_net, classes)
@@ -123,7 +123,7 @@ def main():
 
     classes = settings["inference"]["classes"]
 
-    capture_thread = Thread(target=torch_thread, kwargs={'weights': settings["inference"]["weights"], 'img_size': settings["inference"]["size"], "conf_thres": settings["inference"]["det_conf_thresh"],  "iou_thres": settings["inference"]["iou_thresh"], "classes": classes})
+    capture_thread = Thread(target=torch_thread, kwargs={'weights': settings["inference"]["weights"], 'img_size': settings["inference"]["size"], "conf_thres": settings["inference"]["det_conf_thresh"], "iou_thres": settings["inference"]["iou_thresh"], "agnostic_nms":settings["inference"]["agnostic_nms"], "classes": classes})
     capture_thread.start()
 
     print("Initializing Camera...")
@@ -170,6 +170,7 @@ def main():
     obj_param = sl.ObjectDetectionParameters()
     obj_param.detection_model = sl.OBJECT_DETECTION_MODEL.CUSTOM_BOX_OBJECTS
     obj_param.enable_tracking = True
+    obj_param.filtering_mode = sl.OBJECT_FILTERING_MODE.NONE
     zed.enable_object_detection(obj_param)
 
     objects = sl.Objects()
@@ -179,6 +180,12 @@ def main():
     camera_infos = zed.get_camera_information()
     camera_res = camera_infos.camera_configuration.resolution
     # Create OpenGL viewer
+
+    # output_path = "svorecord.svo2"
+    # recordingParameters = sl.RecordingParameters()
+    # recordingParameters.compression_mode = sl.SVO_COMPRESSION_MODE.H264
+    # recordingParameters.video_filename = output_path
+    # err = zed.enable_recording(recordingParameters)
     
     point_cloud_res = sl.Resolution(min(camera_res.width, 720), min(camera_res.height, 404))
     point_cloud_render = sl.Mat()
@@ -256,11 +263,13 @@ def main():
             viewer.exit()
         exit_signal = True
         zed.close()
+        # zed.disable_recording()
     except KeyboardInterrupt:
         if (visualize):
             viewer.exit()
         exit_signal = True
         zed.close()
+        # zed.disable_recording()
 
 
 def depthModeFromString(string):
@@ -376,7 +385,7 @@ def publishNT(camera, objects, classes):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings', type=str, default="settings.json", help='settings.json path')
-    parser.add_argument('--svo', type=str, default=None, help='optional svo file')
+    parser.add_argument('--svo', type=str, default="svorecord.svo2", help='optional svo file')
     opt = parser.parse_args()
 
     with torch.no_grad():

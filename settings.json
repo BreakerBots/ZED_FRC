@@ -2,7 +2,7 @@
     "visualize": true,
     "camera": {
         "resolution":"HD1080",
-        "fps": 30,
+        "fps": -1,
         "brightness":4,
         "contrast":4,
         "hue": 0,
@@ -27,18 +27,54 @@
         "name":"ZED"
     },
     "inference": {
-        "weights": "models/BreakerBots_noro2024_YOLOv8m.pt",
+        "weights": "models/BreakerBots_multiclassv2_YOLOv8s.pt",
         "size": 640,
-        "det_conf_thresh": 0.0035,
-        "iou_thresh": 0.5,
+        "det_conf_thresh": 0.000001,
+        "iou_thresh": 0.9,
+        "agnostic_nms": false,
         "classes": [
             {
-                "label":"note",
-                "conf_thresh":0.006
+                "label":"black robot",
+                "conf_thresh":0.9
+            },
+            {
+                "label": "blue display",
+                "conf_thresh":0.0
+            },
+            {
+                "label":"blue robot",
+                "conf_thresh":0.0
+            },
+            {
+                "label": "note",
+                "conf_thresh":0.0
+            },
+            {
+                "label":"note5",
+                "conf_thresh":0.0
+            },
+            {
+                "label": "robot6",
+                "conf_thresh":0.0
+            },
+            {
+                "label":"note7",
+                "conf_thresh":0.0
+            },
+            {
+                "label": "robot8",
+                "conf_thresh":0.0
+            },{
+                "label":"note9",
+                "conf_thresh":0.0
+            },
+            {
+                "label": "robot10",
+                "conf_thresh":0.0
             },
             {
                 "label": "robot",
-                "conf_thresh":0.0035
+                "conf_thresh":0.0
             }
         ]
     }
