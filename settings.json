@@ -27,18 +27,18 @@
         "name":"ZED"
     },
     "inference": {
-        "weights": "models/BreakerBots_multiclassv2_YOLOv8s.pt",
+        "weights": "models/BreakerBots_noro2024v2_YOLOv8m.pt",
         "size": 640,
-        "det_conf_thresh": 0.000001,
-        "iou_thresh": 0.9,
-        "agnostic_nms": false,
+        "det_conf_thresh": 0.01,
+        "iou_thresh": 0.3,
+        "agnostic_nms": true,
         "classes": [
             {
-                "label":"black robot",
-                "conf_thresh":0.9
+                "label":"note",
+                "conf_thresh":0.0
             },
             {
-                "label": "blue display",
+                "label": "robot",
                 "conf_thresh":0.0
             },
             {

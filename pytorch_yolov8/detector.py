@@ -385,7 +385,7 @@ def publishNT(camera, objects, classes):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings', type=str, default="settings.json", help='settings.json path')
-    parser.add_argument('--svo', type=str, default="svorecord.svo2", help='optional svo file')
+    parser.add_argument('--svo', type=str, default=None, help='optional svo file')#svorecord.svo2
     opt = parser.parse_args()
 
     with torch.no_grad():
