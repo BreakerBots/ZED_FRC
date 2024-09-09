@@ -88,7 +88,7 @@ def detections_to_custom_box(detections, im0, classes):
     return output
 
 
-def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, classes):
+def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, color_space, classes):
     global image_net, exit_signal, run_signal, detections
 
     print("Intializing Network...")
@@ -103,7 +103,7 @@ def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, classes
         if run_signal:
             lock.acquire()
 
-            img = cv2.cvtColor(image_net, cv2.COLOR_BGRA2RGB)
+            img = cv2.cvtColor(image_net, color_space)
             # https://docs.ultralytics.com/modes/predict/#video-suffixes
             det = model.predict(img, save=False, imgsz=img_size, conf=conf_thres, iou=iou_thres, agnostic_nms=agnostic_nms, device=device)[0].boxes
 
@@ -122,8 +122,8 @@ def main():
     settings = json.load(settingsFile)
 
     classes = settings["inference"]["classes"]
-
-    capture_thread = Thread(target=torch_thread, kwargs={'weights': settings["inference"]["weights"], 'img_size': settings["inference"]["size"], "conf_thres": settings["inference"]["det_conf_thresh"], "iou_thres": settings["inference"]["iou_thresh"], "agnostic_nms":settings["inference"]["agnostic_nms"], "classes": classes})
+    colorSpaceConversion = colorSpaceConversionFromString(settings["inference"]["color_space"])
+    capture_thread = Thread(target=torch_thread, kwargs={'weights': settings["inference"]["weights"], 'img_size': settings["inference"]["size"], "conf_thres": settings["inference"]["det_conf_thresh"], "iou_thres": settings["inference"]["iou_thresh"], "agnostic_nms":settings["inference"]["agnostic_nms"], "color_space":colorSpaceConversion,"classes": classes})
     capture_thread.start()
 
     print("Initializing Camera...")
@@ -271,6 +271,29 @@ def main():
         zed.close()
         # zed.disable_recording()
 
+def colorSpaceConversionFromString(string):
+    string = string.upper()
+    if (string == "BGR"):
+        return cv2.COLOR_BGRA2BGR
+    elif (string == "RGBA"):
+        return cv2.COLOR_BGRA2RGBA
+    elif (string == "GRAY"):
+        return cv2.COLOR_BGRA2GRAY
+    elif (string == "BGR565"):
+        return cv2.COLOR_BGRA2BGR565
+    elif (string == "BGR555"):
+        return cv2.COLOR_BGRA2BGR555
+    elif (string == "YUV_I420"):
+        return cv2.COLOR_BGRA2YUV_I420
+    elif (string == "YUV_IYUV"):
+        return cv2.COLOR_BGRA2YUV_IYUV
+    elif (string == "YUV_YV12"):
+        return cv2.COLOR_BGRA2YUV_YV12
+    else:
+        return cv2.COLOR_BGRA2RGB
+    
+    
+
 
 def depthModeFromString(string):
     string = string.upper()
@@ -385,7 +408,7 @@ def publishNT(camera, objects, classes):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings', type=str, default="settings.json", help='settings.json path')
-    parser.add_argument('--svo', type=str, default=None, help='optional svo file')#svorecord.svo2
+    parser.add_argument('--svo', type=str, default="svorecord.svo2", help='optional svo file')#svorecord.svo2
     opt = parser.parse_args()
 
     with torch.no_grad():
