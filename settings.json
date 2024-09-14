@@ -1,7 +1,7 @@
 {
     "visualize": true,
     "camera": {
-        "resolution":"HD1080",
+        "resolution":"VGA",
         "fps": -1,
         "brightness":4,
         "contrast":4,
@@ -14,7 +14,7 @@
         "wb": -1
     },
     "depth": {
-        "mode": "NEURAL",
+        "mode": "PERFORMANCE",
         "stabilization": 0,
         "depth_conf_thresh": 100,
         "texture_conf_thresh": 100,
@@ -27,10 +27,10 @@
         "name":"ZED"
     },
     "inference": {
-        "weights": "models/Mglp7f_100.pt",
+        "weights": "/home/breakerbots/ZED_FRC/models/lb1o8E_100.pt",
         "color_space": "BGR",
         "size": 640,
-        "det_conf_thresh": 0.3,
+        "det_conf_thresh": 0.15,
         "iou_thresh": 0.5,
         "agnostic_nms": false,
         "classes": [

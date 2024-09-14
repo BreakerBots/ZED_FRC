@@ -94,8 +94,8 @@ def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, color_s
     print("Intializing Network...")
 
     torch.cuda.set_device(0)
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    device = torch.device("cuda")
     model = YOLO(weights, task='detect', verbose=False)
 
 
@@ -408,7 +408,7 @@ def publishNT(camera, objects, classes):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings', type=str, default="settings.json", help='settings.json path')
-    parser.add_argument('--svo', type=str, default="svorecord.svo2", help='optional svo file')#svorecord.svo2
+    parser.add_argument('--svo', type=str, default=None, help='optional svo file')#svorecord.svo2
     opt = parser.parse_args()
 
     with torch.no_grad():
