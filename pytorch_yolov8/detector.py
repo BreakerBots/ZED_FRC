@@ -402,6 +402,7 @@ def publishNT(camera, objects, classes):
     boxLenPub.set(bLenArr)
     boxHeightPub.set(bHeightArr)
     boxWidthPub.set(bWidthArr)
+    nt.NetworkTablesInstance.flush()
     return
 
 
