@@ -39,5 +39,9 @@
                 "conf_thresh":0.0
             }
         ]
+    },
+    "localization": {
+        "publish": true,
+        "spatial_memory": "" 
     }
 }

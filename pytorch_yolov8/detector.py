@@ -20,30 +20,33 @@ import json
 lock = Lock()
 run_signal = False
 exit_signal = False
-
-ntInst = nt.NetworkTableInstance.getDefault()
-ntInst.startClient4("ZED")
-ntInst.setServerTeam(5104)
-ntInst.startDSClient()
-table = ntInst.getTable("ZED_detections")
-heartbeatPub = table.getIntegerTopic("heartbeat").publish()
-idPub = table.getIntegerArrayTopic("id").publish()
-labelPub = table.getStringArrayTopic("label").publish()
-latencyPub = table.getIntegerTopic("pipeline_latency").publish()
-xVelPub = table.getDoubleArrayTopic("x_vel").publish()
-yVelPub = table.getDoubleArrayTopic("y_vel").publish() 
-zVelPub = table.getDoubleArrayTopic("z_vel").publish()
-xPub = table.getDoubleArrayTopic("x").publish()
-yPub = table.getDoubleArrayTopic("y").publish() 
-zPub = table.getDoubleArrayTopic("z").publish()
-boxLenPub = table.getDoubleArrayTopic("box_l").publish()
-boxWidthPub = table.getDoubleArrayTopic("box_w").publish() 
-boxHeightPub = table.getDoubleArrayTopic("box_h").publish() 
-confPub = table.getDoubleArrayTopic("conf").publish() 
-isVisPub = table.getBooleanArrayTopic("is_visible").publish()
-isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
 ntHeartbeat = 0
 
+def configNT(settings):
+    global heartbeatPub, idPub, labelPub, latencyPub, xVelPub, yVelPub, zVelPub, xPub, yPub, zPub, boxLenPub, boxWidthPub, boxHeightPub, confPub, isVisPub, isMovingPub
+    ntInst = nt.NetworkTableInstance.getDefault()
+    ntInst.startClient4(settings["networktables"]["name"])
+    ntInst.setServerTeam(settings["networktables"]["team"])
+    ntInst.startDSClient()
+    mainTable = ntInst.getTable(settings["networktables"]["name"])
+
+    table = mainTable.getSubTable("detections")
+    heartbeatPub = table.getIntegerTopic("heartbeat").publish()
+    idPub = table.getIntegerArrayTopic("id").publish()
+    labelPub = table.getStringArrayTopic("label").publish()
+    latencyPub = table.getIntegerTopic("pipeline_latency").publish()
+    xVelPub = table.getDoubleArrayTopic("x_vel").publish()
+    yVelPub = table.getDoubleArrayTopic("y_vel").publish() 
+    zVelPub = table.getDoubleArrayTopic("z_vel").publish()
+    xPub = table.getDoubleArrayTopic("x").publish()
+    yPub = table.getDoubleArrayTopic("y").publish() 
+    zPub = table.getDoubleArrayTopic("z").publish()
+    boxLenPub = table.getDoubleArrayTopic("box_l").publish()
+    boxWidthPub = table.getDoubleArrayTopic("box_w").publish() 
+    boxHeightPub = table.getDoubleArrayTopic("box_h").publish() 
+    confPub = table.getDoubleArrayTopic("conf").publish() 
+    isVisPub = table.getBooleanArrayTopic("is_visible").publish()
+    isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
 
 def xywh2abcd(xywh, im_shape):
     output = np.zeros((4, 2))
@@ -292,9 +295,6 @@ def colorSpaceConversionFromString(string):
     else:
         return cv2.COLOR_BGRA2RGB
     
-    
-
-
 def depthModeFromString(string):
     string = string.upper()
     if (string == "NEURAL"):
