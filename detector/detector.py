@@ -4,6 +4,8 @@ import sys
 import numpy as np
 
 import argparse
+
+import yaml
 import torch
 import cv2
 import pyzed.sl as sl
@@ -15,12 +17,16 @@ from time import sleep
 import ogl_viewer.viewer as gl
 import cv_viewer.tracking_viewer as cv_viewer
 import ntcore as nt
-import json
+from enum import Enum
 
 lock = Lock()
 run_signal = False
 exit_signal = False
 ntHeartbeat = 0
+
+class CameraType(Enum):
+    ZED_X = 1
+    ZED_2 = 2
 
 def configNT(settings):
     global heartbeatPub, idPub, labelPub, latencyPub, xVelPub, yVelPub, zVelPub, xPub, yPub, zPub, boxLenPub, boxWidthPub, boxHeightPub, confPub, isVisPub, isMovingPub
@@ -122,11 +128,13 @@ def main():
 
     print("Loading Settings...")
     settingsFile = open(opt.settings)
-    settings = json.load(settingsFile)
+    settings = yaml.full_load(settingsFile)
 
-    classes = settings["inference"]["classes"]
-    colorSpaceConversion = colorSpaceConversionFromString(settings["inference"]["color_space"])
-    capture_thread = Thread(target=torch_thread, kwargs={'weights': settings["inference"]["weights"], 'img_size': settings["inference"]["size"], "conf_thres": settings["inference"]["det_conf_thresh"], "iou_thres": settings["inference"]["iou_thresh"], "agnostic_nms":settings["inference"]["agnostic_nms"], "color_space":colorSpaceConversion,"classes": classes})
+
+    inferenceConfig = yaml.full_load(open(settings["inference_config"]))
+    classes = inferenceConfig["classes"]
+    colorSpaceConversion = colorSpaceConversionFromString(inferenceConfig["color_space"])
+    capture_thread = Thread(target=torch_thread, kwargs={'weights': inferenceConfig["weights"], 'img_size': inferenceConfig["size"], "conf_thres": inferenceConfig["det_conf_thresh"], "iou_thres": inferenceConfig["iou_thresh"], "agnostic_nms": inferenceConfig["agnostic_nms"], "color_space":colorSpaceConversion,"classes": classes})
     capture_thread.start()
 
     print("Initializing Camera...")
@@ -140,20 +148,27 @@ def main():
     visualize = settings["visualize"]
     publish = settings["networktables"]["publish"]
 
+    cameraSettings = yaml.full_load(open(settings["camera_config"]))
+    cameraType = cameraTypeFromString(cameraSettings["model"])
+
     # Create a InitParameters object and set configuration parameters
     init_params = sl.InitParameters(input_t=input_type, svo_real_time_mode=True)
     init_params.coordinate_units = sl.UNIT.METER
     init_params.depth_mode = depthModeFromString(settings["depth"]["mode"])
-    init_params.camera_resolution = resolutionFromString(settings["camera"]["resolution"])
-    init_params.camera_fps = settings["camera"]["fps"]
-    init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
+    init_params.camera_resolution = resolutionFromString(cameraSettings["resolution"])
+    init_params.camera_fps = cameraSettings["fps"]
+    init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
     init_params.depth_maximum_distance = settings["depth"]["max_dist"]
     init_params.depth_minimum_distance = settings["depth"]["min_dist"]
+    init_params.depth_stabilization = settings["depth"]["stabilization"]
+    init_params.enable_image_enhancement = cameraSettings["image_enhancement"]
+    init_params.camera_disable_self_calib = not cameraSettings["camera_self_calib"]
     init_params.sdk_verbose = 1
 
     runtime_params = sl.RuntimeParameters()
     runtime_params.confidence_threshold = settings['depth']["depth_conf_thresh"]
     runtime_params.texture_confidence_threshold = settings['depth']["texture_conf_thresh"]
+    runtime_params.remove_saturated_areas = settings['depth']["remove_saturated_areas"]
     status = zed.open(init_params)
 
     if status != sl.ERROR_CODE.SUCCESS:
@@ -274,6 +289,14 @@ def main():
         zed.close()
         # zed.disable_recording()
 
+def cameraTypeFromString(string):
+    string = string.upper()  
+    if (string == "ZEDX" or string == "ZEDXM"):
+        return CameraType.ZED_X
+    else:
+        return CameraType.ZED_2
+    
+
 def colorSpaceConversionFromString(string):
     string = string.upper()
     if (string == "BGR"):
@@ -307,39 +330,76 @@ def depthModeFromString(string):
         return sl.DEPTH_MODE.QUALITY
     else:
         return sl.DEPTH_MODE.ULTRA
-    
-def resolutionFromString(string):
-    string = string.upper()
-    if (string == "HD2K"):
-        return sl.RESOLUTION.HD2K
-    elif (string == "HD1080"):
-        return sl.RESOLUTION.HD1080
-    elif (string == "HD1200"):
-        return sl.RESOLUTION.HD1200
-    elif (string == "HD720"):
-        return sl.RESOLUTION.HD720
-    elif (string == "SVGA"):
-        return sl.RESOLUTION.SVGA
-    elif (string == "VGA"):
-        return sl.RESOLUTION.VGA
-    else:
-        return sl.RESOLUTION.AUTO
 
-def setCameraVideoSettings(camera, settings):
-    camera.set_camera_settings(sl.VIDEO_SETTINGS.BRIGHTNESS, settings["camera"]["brightness"])
-    camera.set_camera_settings(sl.VIDEO_SETTINGS.CONTRAST, settings["camera"]["contrast"])
-    camera.set_camera_settings(sl.VIDEO_SETTINGS.HUE, settings["camera"]["hue"])
-    camera.set_camera_settings(sl.VIDEO_SETTINGS.SATURATION, settings["camera"]["saturation"])
-    camera.set_camera_settings(sl.VIDEO_SETTINGS.SHARPNESS, settings["camera"]["sharpness"])
-    camera.set_camera_settings(sl.VIDEO_SETTINGS.GAMMA, settings["camera"]["gamma"])
-    exp = settings["camera"]["exposure"]
-    gain = settings["camera"]["gain"]
+def resolutionFromString(string, cameraType):
+    string = string.upper()
+    if (cameraType == CameraType.ZED_2):
+        if (string == "HD2K"):
+            return sl.RESOLUTION.HD2K
+        elif (string == "HD1080"):
+            return sl.RESOLUTION.HD1080
+        elif (string == "HD720"):
+            return sl.RESOLUTION.HD720
+        elif (string == "VGA"):
+            return sl.RESOLUTION.VGA
+        else:
+            return sl.RESOLUTION.AUTO
+    else:
+        if (string == "HD1200"):
+            return sl.RESOLUTION.HD1200
+        elif (string == "HD1080"):
+            return sl.RESOLUTION.HD1080
+        elif (string == "SVGA"):
+            return sl.RESOLUTION.SVGA
+        else:
+            return sl.RESOLUTION.AUTO
+        
+def setCameraVideoSettings(cameraType, camera, settings):
+    if (cameraType == CameraType.ZED_X):
+        setCameraVideoSettingsZEDX(camera=camera, settings=settings)
+    else:
+        setCameraVideoSettingsZED2(camera=camera, settings=settings)
+        
+def setCameraVideoSettingsZED2(camera, settings):
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.BRIGHTNESS, settings["brightness"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.CONTRAST, settings["contrast"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.HUE, settings["hue"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.SATURATION, settings["saturation"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.SHARPNESS, settings["sharpness"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.GAMMA, settings["gamma"])
+    exp = settings["exposure"]
+    gain = settings["gain"]
     if (exp < 0 or gain < 0):
         camera.set_camera_settings(sl.VIDEO_SETTINGS.AEC_AGC, 1)
     else:
-        camera.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, settings["camera"]["exposure"])
-        camera.set_camera_settings(sl.VIDEO_SETTINGS.GAIN, settings["camera"]["gain"])
-    wb = settings["camera"]['wb']
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, settings["exposure"])
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.GAIN, settings["gain"])
+    wb = settings['wb']
+    if (wb < 2800 or wb > 6500):
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_AUTO, 1)
+    else:
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE, wb)
+    return
+
+def setCameraVideoSettingsZEDX(camera, settings):
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.SATURATION, settings["saturation"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.SHARPNESS, settings["sharpness"])
+    camera.set_camera_settings(sl.VIDEO_SETTINGS.GAMMA, settings["gamma"])
+    exp = settings["exposure_time"]
+    gain = settings["gain"]
+    aGain = settings["analog_gain"]
+    dGain = settings["digital_gain"]
+    if (exp < 0 or gain < 0):
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.AEC_AGC, 1)
+    else:
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE_TIME, exp)
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.GAIN, settings["gain"])
+
+    if (aGain < 0 or dGain < 0):
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.ANALOG_GAIN, settings["analog_gain"])
+        camera.set_camera_settings(sl.VIDEO_SETTINGS.DIGITAL_GAIN, settings["digital_gain"])
+    
+    wb = settings['wb']
     if (wb < 2800 or wb > 6500):
         camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_AUTO, 1)
     else:

@@ -1,6 +1,6 @@
 # BreakerBots - ZED Depth Camera Object Detection For FRC
 
-This is the co-processor side backend program to control a StereoLabs ZED depth camera for true 3D object detection with YOLOv8. 
+This is the co-processor side backend program to control a StereoLabs ZED depth camera for true 3D object detection with YOLO object detection. 
 
 ### Features
  - Optional visualization tools 

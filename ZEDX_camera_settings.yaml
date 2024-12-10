@@ -1,0 +1,13 @@
+model: ZEDX
+resolution: SVGA
+fps: -1
+saturation: 4
+sharpness: 4
+gamma: 8
+gain: -1
+exposure_time: -1
+analog_gain: -1
+digital_gain: -1
+wb: -1
+image_enhancement: true
+camera_self_calib: true

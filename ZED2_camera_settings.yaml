@@ -1,0 +1,14 @@
+model: ZED2
+resolution: "VGA"
+fps: -1
+brightness: 4
+contrast: 4
+hue: 0
+saturation: 4
+sharpness: 4
+gamma: 8
+gain: -1
+exposure: -1
+wb: -1
+image_enhancement: true
+camera_self_calib: true

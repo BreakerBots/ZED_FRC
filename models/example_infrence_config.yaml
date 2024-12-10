@@ -1,0 +1,15 @@
+weights: "your/path/here.pt" # File path to the YOLOv8, YOLOv9, or YOLOv10 .pt weights
+color_space: RGB # The form of color input the model expects (RGB, BGR, RGBA, GRAY, BGR565, BGR555, YUV_I420, YUV_IYUV, YUV_YV12)
+size: 640 # The horizontal and verticle size of the model's expected image input in pixels
+det_conf_thresh: 0.5 # The minimum confidance a detection must have to be considered
+iou_thresh: 0.5 # The amount two bounding boxes must overlap before NMS* filtering is used. *Used to ensure one object doent ned up with multiple overlaping bounding boxes
+agnostic_nms: false # Weather or not NMS filtering shoud apply to detectons of diffrent classes. (i.e. a 'cow' can not also have an 'animal' bounding box)
+classes:
+        # EXAMPLE
+        # 0: <- The number of this class in the models raw output
+        #   label: foo <- The lable or name of the class
+        #   conf_thresh: 0.0 <- An additional confidnce thresh for this class to accomidate classes with poorer detection perfomance (a value lower then 'det_conf_thresh' does nothing)
+        
+        0:
+            label: name
+            conf_thresh: 0.0
