@@ -1,8 +1,8 @@
 
 general:
     visualize: true # (true, false) Weather or not the local visuilization GUI shoud run to display detections and the real time depth map
-    camera_config: "../ZED2_camera_settings.json" # (File Path) The file path to the camera config yaml which contains the approprate camera video settings
-    inference_config: "../models/2024/frc2024no_YOLOv10n/frc2024no_YOLOv10n.yaml" # (File Path) The file path to the inference config yaml which contains the settings for the YOLO object detector runtime
+    camera_config: "ZED2_camera_settings.yaml" # (File Path) The file path to the camera config yaml which contains the approprate camera video settings
+    inference_config: "models/2024/frc2024no_YOLOv10n/frc2024no_YOLOv10n.yaml" # (File Path) The file path to the inference config yaml which contains the settings for the YOLO object detector runtime
 
 # All settings related to the ZED's stereo depth functionality
 depth: 

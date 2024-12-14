@@ -3,6 +3,10 @@
 import sys
 import numpy as np
 
+# avoid connection errors from yolo analytics connecting to github
+import os
+os.environ['YOLO_OFFLINE']='true'
+
 import argparse
 
 import yaml
@@ -30,6 +34,7 @@ class CameraType(Enum):
 
 def configNT(settings):
     global heartbeatPub, idPub, labelPub, latencyPub, xVelPub, yVelPub, zVelPub, xPub, yPub, zPub, boxLenPub, boxWidthPub, boxHeightPub, confPub, isVisPub, isMovingPub
+    #global ntInst
     ntInst = nt.NetworkTableInstance.getDefault()
     ntInst.startClient4(settings["networktables"]["name"])
     ntInst.setServerTeam(settings["networktables"]["team"])
@@ -104,7 +109,7 @@ def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, color_s
 
     torch.cuda.set_device(0)
     # torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    device = torch.device("cuda")
+    device = torch.device("cuda")            
     model = YOLO(weights, task='detect', verbose=False)
 
 
@@ -131,7 +136,7 @@ def main():
     settings = yaml.full_load(settingsFile)
 
 
-    inferenceConfig = yaml.full_load(open(settings["inference_config"]))
+    inferenceConfig = yaml.full_load(open(settings["general"]["inference_config"]))
     classes = inferenceConfig["classes"]
     colorSpaceConversion = colorSpaceConversionFromString(inferenceConfig["color_space"])
     capture_thread = Thread(target=torch_thread, kwargs={'weights': inferenceConfig["weights"], 'img_size': inferenceConfig["size"], "conf_thres": inferenceConfig["det_conf_thresh"], "iou_thres": inferenceConfig["iou_thresh"], "agnostic_nms": inferenceConfig["agnostic_nms"], "color_space":colorSpaceConversion,"classes": classes})
@@ -145,17 +150,19 @@ def main():
     if opt.svo is not None:
         input_type.set_from_svo_file(opt.svo)
 
-    visualize = settings["visualize"]
+    visualize = settings["general"]["visualize"]
     publish = settings["networktables"]["publish"]
+    if publish:
+        configNT(settings)
 
-    cameraSettings = yaml.full_load(open(settings["camera_config"]))
+    cameraSettings = yaml.full_load(open(settings["general"]["camera_config"]))
     cameraType = cameraTypeFromString(cameraSettings["model"])
 
     # Create a InitParameters object and set configuration parameters
     init_params = sl.InitParameters(input_t=input_type, svo_real_time_mode=True)
     init_params.coordinate_units = sl.UNIT.METER
     init_params.depth_mode = depthModeFromString(settings["depth"]["mode"])
-    init_params.camera_resolution = resolutionFromString(cameraSettings["resolution"])
+    init_params.camera_resolution = resolutionFromString(cameraSettings["resolution"], cameraType)
     init_params.camera_fps = cameraSettings["fps"]
     init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
     init_params.depth_maximum_distance = settings["depth"]["max_dist"]
@@ -176,7 +183,7 @@ def main():
         exit()
 
     image_left_tmp = sl.Mat()
-    setCameraVideoSettings(zed, settings)
+    setCameraVideoSettings(cameraType, zed, cameraSettings)
 
     print("Initialized Camera")  
 
@@ -407,7 +414,7 @@ def setCameraVideoSettingsZEDX(camera, settings):
     return
 
 def publishNT(camera, objects, classes):
-    global ntHeartbeat
+    global heartbeatPub, ntHeartbeat
     xArr = []
     yArr = []
     zArr = []
@@ -428,7 +435,6 @@ def publishNT(camera, objects, classes):
     latencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - objects.timestamp.get_nanoseconds())
 
     objList = objects.object_list
-    numObjs = __builtins__.len(objList)
     for obj in objList:
         idArr.append(obj.id)
         confArr.append(obj.confidence/100.0)
@@ -462,13 +468,13 @@ def publishNT(camera, objects, classes):
     boxLenPub.set(bLenArr)
     boxHeightPub.set(bHeightArr)
     boxWidthPub.set(bWidthArr)
-    nt.NetworkTablesInstance.flush()
+    nt.NetworkTableInstance.getDefault().flush()
     return
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--settings', type=str, default="settings.json", help='settings.json path')
+    parser.add_argument('--settings', type=str, default="settings.yaml", help='settings.yaml path')
     parser.add_argument('--svo', type=str, default=None, help='optional svo file')#svorecord.svo2
     opt = parser.parse_args()
 
