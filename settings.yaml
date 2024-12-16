@@ -11,7 +11,7 @@ depth:
     depth_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their confidence. Decreasing this value will remove depth data from both objects edges and low textured areas, to keep only confident depth estimation data. 
     texture_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their texture confidence. Decreasing this value will remove depth data from image areas which are uniform. 
     remove_saturated_areas: true # Weather or not areas with a saturaton of 255 should be removed from depth calculations due to a lack of any detail
-    max_dist: 20.0 
+    max_dist: 20.0 #The maximum
     min_dist: -1
 
 networktables:
@@ -20,7 +20,12 @@ networktables:
     name: ZED
 
 localization:
-    enable: true
-    spatial_memory: true
+    area_memory: true
+    pose_smoothing: false
+    use_gravity_origin: true
     min_depth: -1
     mode: GEN1
+
+recording:
+    record_svo: false
+    svo_path:  

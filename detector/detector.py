@@ -21,6 +21,7 @@ from time import sleep
 import ogl_viewer.viewer as gl
 import cv_viewer.tracking_viewer as cv_viewer
 import ntcore as nt
+from wpimath import geometry as geom
 from enum import Enum
 
 lock = Lock()
@@ -33,8 +34,7 @@ class CameraType(Enum):
     ZED_2 = 2
 
 def configNT(settings):
-    global heartbeatPub, idPub, labelPub, latencyPub, xVelPub, yVelPub, zVelPub, xPub, yPub, zPub, boxLenPub, boxWidthPub, boxHeightPub, confPub, isVisPub, isMovingPub
-    #global ntInst
+    global heartbeatPub, idPub, labelPub, latencyPub, xVelPub, yVelPub, zVelPub, xPub, yPub, zPub, boxLenPub, boxWidthPub, boxHeightPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, ntInst
     ntInst = nt.NetworkTableInstance.getDefault()
     ntInst.startClient4(settings["networktables"]["name"])
     ntInst.setServerTeam(settings["networktables"]["team"])
@@ -58,6 +58,9 @@ def configNT(settings):
     confPub = table.getDoubleArrayTopic("conf").publish() 
     isVisPub = table.getBooleanArrayTopic("is_visible").publish()
     isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
+    camPosePub = table.getStructTopic("cam_pose").publish()
+    camOriginPub = table.getStructTopic("cam_pose_origin").publish()
+    camPoseLatencyPub = table.getDoubleTopic("cam_pose_latency").publish()
 
 def xywh2abcd(xywh, im_shape):
     output = np.zeros((4, 2))
@@ -164,7 +167,7 @@ def main():
     init_params.depth_mode = depthModeFromString(settings["depth"]["mode"])
     init_params.camera_resolution = resolutionFromString(cameraSettings["resolution"], cameraType)
     init_params.camera_fps = cameraSettings["fps"]
-    init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
+    init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP #sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
     init_params.depth_maximum_distance = settings["depth"]["max_dist"]
     init_params.depth_minimum_distance = settings["depth"]["min_dist"]
     init_params.depth_stabilization = settings["depth"]["stabilization"]
@@ -190,6 +193,11 @@ def main():
     positional_tracking_parameters = sl.PositionalTrackingParameters()
     # If the camera is static, uncomment the following line to have better performances and boxes sticked to the ground.
     # positional_tracking_parameters.set_as_static = True
+    positional_tracking_parameters.enable_area_memory = settings["localization"]["area_memory"]
+    positional_tracking_parameters.enable_pose_smoothing = settings["localization"]["pose_smoothing"]
+    positional_tracking_parameters.set_gravity_as_origin = settings["localization"]["use_gravity_origin"]
+    positional_tracking_parameters.depth_min_range = settings["localization"]["min_depth"]
+    positional_tracking_parameters.mode = positionalTrackingModeFromString(settings["localization"]["mode"])
     zed.enable_positional_tracking(positional_tracking_parameters)
 
     obj_param = sl.ObjectDetectionParameters()
@@ -256,6 +264,10 @@ def main():
                 lock.release()
                 zed.retrieve_objects(objects, obj_runtime_param)
 
+                if (visualize or publish):
+                    zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
+
+
                 if (publish):
                     publishNT(zed, objects, classes)
 
@@ -265,7 +277,6 @@ def main():
                     zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, point_cloud_res)
                     point_cloud.copy_to(point_cloud_render)
                     zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
-                    zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
 
                     # 3D rendering
                     viewer.updateData(point_cloud_render, objects)
@@ -295,6 +306,23 @@ def main():
         exit_signal = True
         zed.close()
         # zed.disable_recording()
+
+def slPoseToWPILib(slPose):
+    rotVec = slPose.get_rotation_vector()
+    slTrans = sl.Translation()
+    slPose.get_translation(slTrans)
+    
+    wpiRot = geom.Rotation3d(rotVec)
+    wpiTrans = geom.Translation3d(slTrans.get())
+    return geom.Pose3d(wpiTrans, wpiRot)
+
+
+def positionalTrackingModeFromString(string):
+    string = string.upper()
+    if (string == "GEN_2" or string == "GEN-2" or string == "GEN2"):
+        return sl.POSITIONAL_TRACKING_MODE.GEN_2
+    else:
+        return sl.POSITIONAL_TRACKING_MODE.GEN_1
 
 def cameraTypeFromString(string):
     string = string.upper()  
@@ -413,7 +441,7 @@ def setCameraVideoSettingsZEDX(camera, settings):
         camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE, wb)
     return
 
-def publishNT(camera, objects, classes):
+def publishNT(camera, cam_w_pose, objects, classes):
     global heartbeatPub, ntHeartbeat
     xArr = []
     yArr = []
@@ -433,6 +461,7 @@ def publishNT(camera, objects, classes):
     heartbeatPub.set(ntHeartbeat)
     ntHeartbeat+=1
     latencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - objects.timestamp.get_nanoseconds())
+    camPoseLatencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - cam_w_pose.get_nanoseconds())
 
     objList = objects.object_list
     for obj in objList:
@@ -468,14 +497,17 @@ def publishNT(camera, objects, classes):
     boxLenPub.set(bLenArr)
     boxHeightPub.set(bHeightArr)
     boxWidthPub.set(bWidthArr)
-    nt.NetworkTableInstance.getDefault().flush()
+    ntInst.flush()
+    wpiPose = slPoseToWPILib(cam_w_pose)
+    camPosePub.set(wpiPose)
+    # camOriginPub.set()
     return
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings', type=str, default="settings.yaml", help='settings.yaml path')
-    parser.add_argument('--svo', type=str, default=None, help='optional svo file')#svorecord.svo2
+    parser.add_argument('--svo', type=str, default="svorecord.svo2", help='optional svo file')#svorecord.svo2
     opt = parser.parse_args()
 
     with torch.no_grad():

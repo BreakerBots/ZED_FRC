@@ -31,6 +31,8 @@ pip install ultralytics
 python detector.py --settings settings.json # [--svo path/to/file.svo]
 ```
 
+## Networktables API
+
 ## Training your own model
 
 This program can use any model trained with YOLOv8, including custom trained one. For a getting started on how to trained a model on a custom dataset with YOLOv5, see here https://docs.ultralytics.com/tutorials/train-custom-datasets/
