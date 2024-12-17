@@ -58,8 +58,8 @@ def configNT(settings):
     confPub = table.getDoubleArrayTopic("conf").publish() 
     isVisPub = table.getBooleanArrayTopic("is_visible").publish()
     isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
-    camPosePub = table.getStructTopic("cam_pose").publish()
-    camOriginPub = table.getStructTopic("cam_pose_origin").publish()
+    camPosePub = table.getStructTopic("cam_pose", geom.Pose3d).publish()
+    camOriginPub = table.getStructTopic("cam_pose_origin", geom.Pose3d).publish()
     camPoseLatencyPub = table.getDoubleTopic("cam_pose_latency").publish()
 
 def xywh2abcd(xywh, im_shape):
