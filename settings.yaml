@@ -26,6 +26,13 @@ localization:
     min_depth: -1
     mode: GEN1
 
-recording:
-    record_svo: false
-    svo_path:  
+visualization:
+    desktop:
+        ocv_2d: false
+        point_cloud_3d: false
+    webserver:
+        enable: false
+        host: '127.0.0.1'
+        port: 5000
+        
+    

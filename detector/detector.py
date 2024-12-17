@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import threading
 import numpy as np
 
 # avoid connection errors from yolo analytics connecting to github
@@ -23,15 +24,61 @@ import cv_viewer.tracking_viewer as cv_viewer
 import ntcore as nt
 from wpimath import geometry as geom
 from enum import Enum
+from flask import Flask, Response
+from werkzeug.serving import make_server
+
+# Create Flask app
+app = Flask(__name__)
 
 lock = Lock()
 run_signal = False
 exit_signal = False
 ntHeartbeat = 0
+global_image = np.zeros((720, 1280, 3), dtype=np.uint8) 
 
 class CameraType(Enum):
     ZED_X = 1
     ZED_2 = 2
+
+class ServerThread(threading.Thread):
+
+    def __init__(self, host, port):
+        threading.Thread.__init__(self)
+        self.server = make_server(host, port, app)
+        self.ctx = app.app_context()
+        self.ctx.push()
+
+    def run(self):
+        self.server.serve_forever()
+
+    def shutdown(self):
+        self.server.shutdown()
+
+def start_server():
+    global server
+    # App routes defined here
+    server = ServerThread(app)
+    server.start()
+
+def stop_server():
+    global server
+    server.shutdown()
+
+# Initialize the Flask route for streaming
+@app.route('/video_feed')
+def video_feed():
+    def generate():
+        while not exit_signal:
+            # Capture the image and encode it in JPEG format
+            # lock.acquire()
+            ret, jpeg = cv2.imencode('.jpg', global_image)
+            # lock.release()
+            if ret:
+                # Return the image as a response with the correct MIME type for MJPEG
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n\r\n')
+            sleep(0.01)  # Avoid 100% CPU usage
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 def configNT(settings):
     global heartbeatPub, idPub, labelPub, latencyPub, xVelPub, yVelPub, zVelPub, xPub, yPub, zPub, boxLenPub, boxWidthPub, boxHeightPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, ntInst
@@ -132,7 +179,8 @@ def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, color_s
 
 
 def main():
-    global image_net, exit_signal, run_signal, detections
+    global image_net, exit_signal, run_signal, detections, global_image, flask_thread, fps
+    fps = 0.0
 
     print("Loading Settings...")
     settingsFile = open(opt.settings)
@@ -153,7 +201,17 @@ def main():
     if opt.svo is not None:
         input_type.set_from_svo_file(opt.svo)
 
-    visualize = settings["general"]["visualize"]
+    viz_ogl = settings["visualization"]["desktop"]["point_cloud_3d"]
+    viz_ocv_disp = settings["visualization"]["desktop"]["ocv_2d"]
+    viz_webserver = settings["visualization"]["webserver"]["enable"]
+    viz_ocv_backend = viz_ocv_disp or viz_webserver
+    
+    if (viz_webserver):
+         # Start Flask app in a separate thread
+        flask_thread = ServerThread(settings["visualization"]["webserver"]["host"], settings["visualization"]["webserver"]["port"])
+        flask_thread.start()
+    
+
     publish = settings["networktables"]["publish"]
     if publish:
         configNT(settings)
@@ -223,28 +281,30 @@ def main():
     point_cloud_res = sl.Resolution(min(camera_res.width, 720), min(camera_res.height, 404))
     point_cloud_render = sl.Mat()
     viewer = None
-    if (visualize):
+    if (viz_ogl):
         viewer = gl.GLViewer()
         viewer.init(camera_infos.camera_model, point_cloud_res, obj_param.enable_tracking)
-    point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
-    image_left = sl.Mat()
-    # Utilities for 2D display
-    display_resolution = sl.Resolution(min(camera_res.width, 1280), min(camera_res.height, 720))
-    image_scale = [display_resolution.width / camera_res.width, display_resolution.height / camera_res.height]
-    image_left_ocv = np.full((display_resolution.height, display_resolution.width, 4), [245, 239, 239, 255], np.uint8)
+        point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
+        
+    if (viz_ocv_backend):
+        # Utilities for 2D display
+        image_left = sl.Mat()
+        display_resolution = sl.Resolution(min(camera_res.width, 1280), min(camera_res.height, 720))
+        image_scale = [display_resolution.width / camera_res.width, display_resolution.height / camera_res.height]
+        image_left_ocv = np.full((display_resolution.height, display_resolution.width, 4), [245, 239, 239, 255], np.uint8)
 
-    # Utilities for tracks view
-    camera_config = camera_infos.camera_configuration
-    tracks_resolution = sl.Resolution(400, display_resolution.height)
-    track_view_generator = None
-    if (visualize):
+        # Utilities for tracks view
+        camera_config = camera_infos.camera_configuration
+        tracks_resolution = sl.Resolution(400, display_resolution.height)
+        track_view_generator = None
         track_view_generator = cv_viewer.TrackingViewer(tracks_resolution, camera_config.fps, init_params.depth_maximum_distance)
         track_view_generator.set_camera_calibration(camera_config.calibration_parameters)
-    image_track_ocv = np.zeros((tracks_resolution.height, tracks_resolution.width, 4), np.uint8)
+        image_track_ocv = np.zeros((tracks_resolution.height, tracks_resolution.width, 4), np.uint8)
     # Camera pose
     cam_w_pose = sl.Pose()
+    prev_frame_time = zed.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds()
     try:
-        while (not visualize or viewer.is_available()) and not exit_signal:
+        while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
                 # -- Get the image
                 lock.acquire()
@@ -264,30 +324,43 @@ def main():
                 lock.release()
                 zed.retrieve_objects(objects, obj_runtime_param)
 
-                if (visualize or publish):
+                if (viz_ocv_disp or publish):
                     zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
 
 
                 if (publish):
-                    publishNT(zed, objects, classes)
+                    publishNT(zed, cam_w_pose, objects, classes)
 
-                if (visualize):
+                if (viz_ogl):
                     # -- Display
                     # Retrieve display data
                     zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, point_cloud_res)
                     point_cloud.copy_to(point_cloud_render)
-                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
 
                     # 3D rendering
-                    viewer.updateData(point_cloud_render, objects)
+                    viewer.updateData(point_cloud_render, objects)   
+
+                    
+                if (viz_ocv_backend):
+                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
                     # 2D rendering
                     np.copyto(image_left_ocv, image_left.get_data())
                     cv_viewer.render_2D(image_left_ocv, image_scale, objects, obj_param.enable_tracking, classes)
+    
                     global_image = cv2.hconcat([image_left_ocv, image_track_ocv])
+                    cv2.putText(global_image, str(int(fps)), (7, 70), cv2.FONT_HERSHEY_SIMPLEX , 3, (100, 255, 0), 3, cv2.LINE_AA) 
                     # Tracking view
                     track_view_generator.generate_view(objects, cam_w_pose, image_track_ocv, objects.is_tracked)
 
-                    cv2.imshow("ZED | 2D View and Birds View", global_image)
+                    if (viz_ocv_disp):
+                        cv2.imshow("ZED | 2D View and Birds View", global_image)
+                    
+
+                cur_time = zed.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds()
+                delta_t = (cur_time - prev_frame_time)
+                fps = 0 if (delta_t == 0) else 1e9 / delta_t
+                print("fps: " + str(int(fps)))
+                prev_frame_time = cur_time
             
                 key = cv2.waitKey(10)
                 if key == 27:
@@ -295,14 +368,18 @@ def main():
             else:
                 exit_signal = True
 
-        if (visualize):
+        if (viz_ogl):
             viewer.exit()
+        if (viz_webserver):
+            flask_thread.shutdown()
         exit_signal = True
         zed.close()
         # zed.disable_recording()
     except KeyboardInterrupt:
-        if (visualize):
+        if (viz_ogl):
             viewer.exit()
+        if (viz_webserver):
+            flask_thread.shutdown()
         exit_signal = True
         zed.close()
         # zed.disable_recording()
@@ -461,7 +538,7 @@ def publishNT(camera, cam_w_pose, objects, classes):
     heartbeatPub.set(ntHeartbeat)
     ntHeartbeat+=1
     latencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - objects.timestamp.get_nanoseconds())
-    camPoseLatencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - cam_w_pose.get_nanoseconds())
+    camPoseLatencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - cam_w_pose.timestamp.get_nanoseconds())
 
     objList = objects.object_list
     for obj in objList:
