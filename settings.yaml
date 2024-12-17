@@ -11,28 +11,30 @@ depth:
     depth_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their confidence. Decreasing this value will remove depth data from both objects edges and low textured areas, to keep only confident depth estimation data. 
     texture_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their texture confidence. Decreasing this value will remove depth data from image areas which are uniform. 
     remove_saturated_areas: true # Weather or not areas with a saturaton of 255 should be removed from depth calculations due to a lack of any detail
-    max_dist: 20.0 #The maximum
-    min_dist: -1
+    max_dist: 20.0 #The maximum distance the ZED will calculate depth data for
+    min_dist: -1 #The minimum distance the ZED will calculate depth data for, -1 set this value to the default
 
+# All settings relatated to the ZED's NT interactions
 networktables:
-    publish: true
-    team: 5104
-    name: ZED
+    publish: true # If this programme shoud publish detection data to NT
+    team: 5104 # The team number of the NT server
+    name: ZED # The name of the NT client and main table
 
+# All settings related to the ZED's VIO/SLAM abilities
 localization:
-    area_memory: true
-    pose_smoothing: false
-    use_gravity_origin: true
-    min_depth: -1
-    mode: GEN1
+    area_memory: true # If the ZED shoud map its suroundings during operation to improve localization accuracy, slight perfomance hit
+    pose_smoothing: false # If the ZED shoud smooth out the sudden pose change caused by loop closure when in SLAM mode
+    use_gravity_origin: true # If the ZED should use the direction of gravity to estimate its angle relitive to the ground, only effects world reletive values like pose
+    min_depth: -1 # The minimum depth of pixles to be used in VIO caclulations, helps ignore fixed obstructuions in your view frame like robot parts
+    mode: GEN1 # (GEN1, GEN2) The type of pose estimation to be used, GEN2 performs better but has more of a performance demand
 
 visualization:
     desktop:
-        ocv_2d: false
-        point_cloud_3d: false
+        ocv_2d: false # If the 2D OpenCV bounding box and overhead views shoud be shown on the desktop
+        point_cloud_3d: false # If the 3D point cloud render and 3D object bounding boxes shoud be shown on the desktop
     webserver:
-        enable: false
-        host: '127.0.0.1'
-        port: 5000
+        enable: false # If the flask webserver which livestream's the OpenCV visulization to the configured host and port shoud run
+        host: '127.0.0.1' # The IP address the webserer shoud stream to
+        port: 5000 # The port the webserver should stream to
         
     
