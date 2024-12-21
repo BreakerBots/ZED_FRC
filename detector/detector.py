@@ -65,7 +65,7 @@ def stop_server():
     server.shutdown()
 
 # Initialize the Flask route for streaming
-@app.route('/video_feed')
+@app.route('/')
 def video_feed():
     def generate():
         while not exit_signal:
@@ -152,7 +152,7 @@ def detections_to_custom_box(detections, im0, classes):
     return output
 
 
-def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, color_space, classes):
+def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, color_space, half_p, classes):
     global image_net, exit_signal, run_signal, detections
 
     print("Intializing Network...")
@@ -169,7 +169,7 @@ def torch_thread(weights, img_size, conf_thres, iou_thres, agnostic_nms, color_s
 
             img = cv2.cvtColor(image_net, color_space)
             # https://docs.ultralytics.com/modes/predict/#video-suffixes
-            det = model.predict(img, save=False, imgsz=img_size, conf=conf_thres, iou=iou_thres, agnostic_nms=agnostic_nms, device=device)[0].boxes
+            det = model.predict(img, save=False, imgsz=img_size, conf=conf_thres, iou=iou_thres, agnostic_nms=agnostic_nms, device=device, half=half_p)[0].boxes
 
             # ZED CustomBox format (with inverse letterboxing tf applied)
             detections = detections_to_custom_box(det, image_net, classes)
@@ -190,7 +190,7 @@ def main():
     inferenceConfig = yaml.full_load(open(settings["general"]["inference_config"]))
     classes = inferenceConfig["classes"]
     colorSpaceConversion = colorSpaceConversionFromString(inferenceConfig["color_space"])
-    capture_thread = Thread(target=torch_thread, kwargs={'weights': inferenceConfig["weights"], 'img_size': inferenceConfig["size"], "conf_thres": inferenceConfig["det_conf_thresh"], "iou_thres": inferenceConfig["iou_thresh"], "agnostic_nms": inferenceConfig["agnostic_nms"], "color_space":colorSpaceConversion,"classes": classes})
+    capture_thread = Thread(target=torch_thread, kwargs={'weights': inferenceConfig["weights"], 'img_size': inferenceConfig["size"], "conf_thres": inferenceConfig["det_conf_thresh"], "iou_thres": inferenceConfig["iou_thresh"], "agnostic_nms": inferenceConfig["agnostic_nms"], "half_p": inferenceConfig["half_precision"], "color_space":colorSpaceConversion,"classes": classes})
     capture_thread.start()
 
     print("Initializing Camera...")
@@ -348,7 +348,7 @@ def main():
                     cv_viewer.render_2D(image_left_ocv, image_scale, objects, obj_param.enable_tracking, classes)
     
                     global_image = cv2.hconcat([image_left_ocv, image_track_ocv])
-                    cv2.putText(global_image, str(int(fps)), (7, 70), cv2.FONT_HERSHEY_SIMPLEX , 3, (100, 255, 0), 3, cv2.LINE_AA) 
+                    # cv2.putText(global_image, str(int(fps)), (7, 70), cv2.FONT_HERSHEY_SIMPLEX , 3, (100, 255, 0), 3, cv2.LINE_AA) 
                     # Tracking view
                     track_view_generator.generate_view(objects, cam_w_pose, image_track_ocv, objects.is_tracked)
 
