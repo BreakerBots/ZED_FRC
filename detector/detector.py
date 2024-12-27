@@ -140,15 +140,15 @@ def detections_to_custom_box(detections, im0, classes):
     for i, det in enumerate(detections):
         conf = det.conf
         cls = det.cls
-        if (conf >= classes[int(cls)]["conf_thresh"]):
-            xywh = det.xywh[0]
-            # Creating ingestable objects for the ZED SDK
-            obj = sl.CustomBoxObjectData()
-            obj.bounding_box_2d = xywh2abcd(xywh, im0.shape)
-            obj.label = cls
-            obj.probability = conf
-            obj.is_grounded = False
-            output.append(obj)
+        # if (conf >= classes[int(cls)]["conf_thresh"]):
+        xywh = det.xywh[0]
+        # Creating ingestable objects for the ZED SDK
+        obj = sl.CustomBoxObjectData()
+        obj.bounding_box_2d = xywh2abcd(xywh, im0.shape)
+        obj.label = cls
+        obj.probability = conf
+        obj.is_grounded = False
+        output.append(obj)
     return output
 
 
@@ -261,7 +261,7 @@ def main():
     obj_param = sl.ObjectDetectionParameters()
     obj_param.detection_model = sl.OBJECT_DETECTION_MODEL.CUSTOM_BOX_OBJECTS
     obj_param.enable_tracking = True
-    obj_param.filtering_mode = sl.OBJECT_FILTERING_MODE.NONE
+    obj_param.filtering_mode = sl.OBJECT_FILTERING_MODE.NMS3D
     zed.enable_object_detection(obj_param)
 
     objects = sl.Objects()

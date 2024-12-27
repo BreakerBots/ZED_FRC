@@ -16,7 +16,7 @@ depth:
 
 # All settings relatated to the ZED's NT interactions
 networktables:
-    publish: true # If this programme shoud publish detection data to NT
+    publish: false # If this programme shoud publish detection data to NT
     team: 5104 # The team number of the NT server
     name: ZED # The name of the NT client and main table
 
@@ -30,7 +30,7 @@ localization:
 
 visualization:
     desktop:
-        ocv_2d: false # If the 2D OpenCV bounding box and overhead views shoud be shown on the desktop
+        ocv_2d: true # If the 2D OpenCV bounding box and overhead views shoud be shown on the desktop
         point_cloud_3d: false # If the 3D point cloud render and 3D object bounding boxes shoud be shown on the desktop
     webserver:
         enable: true # If the flask webserver which livestream's the OpenCV visulization to the configured host and port shoud run
