@@ -109,9 +109,6 @@ def main():
     settings = yaml.full_load(settingsFile)
 
 
-    inferenceConfig = yaml.full_load(open(settings["general"]["inference_config"]))
-    classes = inferenceConfig["classes"]
-    colorSpaceConversion = colorSpaceConversionFromString(inferenceConfig["color_space"])
 
     print("Initializing Camera...")
 
@@ -178,17 +175,11 @@ def main():
     positional_tracking_parameters.mode = positionalTrackingModeFromString(settings["localization"]["mode"])
     zed.enable_positional_tracking(positional_tracking_parameters)
 
-    obj_param = sl.ObjectDetectionParameters()
-    obj_param.detection_model = sl.OBJECT_DETECTION_MODEL.CUSTOM_YOLOLIKE_BOX_OBJECTS
-    obj_param.custom_onnx_file = "models/xqJ46o_100.onnx"
-    obj_param.custom_onnx_dynamic_input_shape = sl.Resolution(640,640)
-    obj_param.enable_tracking = True
-    obj_param.filtering_mode = sl.OBJECT_FILTERING_MODE.NMS3D
-    zed.enable_object_detection(obj_param)
-
     objects = sl.Objects()
     obj_runtime_param = sl.ObjectDetectionRuntimeParameters()
-    custom_obj_runtime_param = sl.CustomObjectDetectionRuntimeParameters()
+    
+    objPeram, rtPerams, classes = startObjectDetectionFromYaml(settings["general"]["inference_config"], zed)
+
 
     # Display
     camera_infos = zed.get_camera_information()
@@ -230,7 +221,7 @@ def main():
         while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
                
-                zed.retrieve_objects(objects, custom_obj_runtime_param)
+                zed.retrieve_objects(objects, rtPerams)
 
                 if (viz_ocv_disp or publish):
                     zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
@@ -253,7 +244,7 @@ def main():
                     zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
                     # 2D rendering
                     np.copyto(image_left_ocv, image_left.get_data())
-                    cv_viewer.render_2D(image_left_ocv, image_scale, objects, obj_param.enable_tracking, classes)
+                    cv_viewer.render_2D(image_left_ocv, image_scale, objects, objPeram.enable_tracking, classes)
     
                     global_image = cv2.hconcat([image_left_ocv, image_track_ocv])
                     cv2.putText(global_image, str(int(fps)), (7, 70), cv2.FONT_HERSHEY_SIMPLEX , 3, (100, 255, 0), 3, cv2.LINE_AA) 
@@ -290,15 +281,59 @@ def main():
         zed.close()
         # zed.disable_recording()
 
+def defaultIfNotValue(value, returnDefaultCheckLambda, default):
+    if (returnDefaultCheckLambda(value)):
+        return default
+    else:
+        return value
+
 def startObjectDetectionFromYaml(inferenceSettingsPath, zed):
     inferenceConfig = yaml.full_load(open(inferenceSettingsPath))
     obj_param = sl.ObjectDetectionParameters()
     obj_param.detection_model = sl.OBJECT_DETECTION_MODEL.CUSTOM_YOLOLIKE_BOX_OBJECTS
     obj_param.custom_onnx_file = inferenceConfig["weights"]
-    obj_param.custom_onnx_dynamic_input_shape = sl.Resolution(inferenceConfig["input_shape"]["horizontal"],inferenceConfig["input_shape"]["horizontal"])
+    obj_param.custom_onnx_dynamic_input_shape = sl.Resolution(inferenceConfig["input_shape"]["horizontal"],inferenceConfig["input_shape"]["vertical"])
     obj_param.enable_tracking = True
-    obj_param.filtering_mode = sl.OBJECT_FILTERING_MODE.NMS3D
+    obj_param.filtering_mode = filteringModeFromString(inferenceConfig["filter_type"])
+    obj_param.prediction_timeout_s = defaultIfNotValue(inferenceConfig["global_defaults"]["tracking_timeout"], lambda x : x < 0, 0.2)
+    obj_param.max_range = defaultIfNotValue(inferenceConfig["global_defaults"]["max_tracking_dist"], lambda x : x == 0 or x < 0, 10)
     zed.enable_object_detection(obj_param)
+    
+    defaultDetConf = inferenceConfig["global_defaults"]["max_tracking_dist"] * 100
+    defaultProps = sl.CustomObjectDetectionProperties()
+    defaultProps.detection_confidence_threshold = defaultDetConf
+    defaultProps.tracking_timeout = obj_param.prediction_timeout_s
+    defaultProps.tracking_max_dist =  obj_param.max_range
+
+    classes = inferenceConfig["classes"]
+    props = []
+    for x in range(0,len(classes)):
+        props.append(customObjectDetectionPropertiesFromConfig(classes[x], defaultProps))
+
+    rtPerams = sl.CustomObjectDetectionRuntimeParameters()
+
+    rtPerams.object_detection_properties = defaultProps
+    rtPerams.object_class_detection_properties = props
+
+    zed.enable_object_detection(obj_param)
+
+    return (obj_param, rtPerams, classes)
+
+def customObjectDetectionPropertiesFromConfig(config, defaultProps):
+    props = sl.CustomObjectDetectionProperties()
+    props.enabled = config["enabled"]
+    props.detection_confidence_threshold = defaultIfNotValue(config["conf_thresh"] * 100, lambda x : x < 0, defaultProps.detection_confidence_threshold)
+    props.is_grounded = config["is_grounded"]
+    props.is_static = config["is_static"]
+    props.tracking_timeout = defaultIfNotValue(config["tracking_timeout"], lambda x : x < 0, defaultProps.tracking_timeout)
+    props.tracking_max_dist =  defaultIfNotValue(config["max_tracking_dist"], lambda x : x == 0 or x < 0, defaultProps.tracking_max_dist)
+    props.max_box_width_normalized = config["max_box_norm"]["width"]
+    props.max_box_height_normalized  = config["max_box_norm"]["height"]
+    props.min_box_width_normalized = config["min_box_norm"]["width"]
+    props.min_box_height_normalized  = config["min_box_norm"]["height"]
+    return props
+
+
     
 def filteringModeFromString(string):
     string = string.upper()

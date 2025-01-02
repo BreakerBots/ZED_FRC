@@ -5,17 +5,9 @@ input_shape:  # The horizontal and verticle size of the model's expected image i
 filter_type: "NMS3D"
 
 global_defaults:
-            conf_thresh: -1.0
-            is_grounded: true
-            is_static: false
-            tracking_timeout: -1.0
-            max_tracking_dist: -1.0
-            max_box_norm:
-              width: -1
-              height: -1
-            min_box_norm:
-              width: -1
-              height: -1
+  conf_thresh: -1.0
+  tracking_timeout: -1.0
+  max_tracking_dist: -1.0
   
 classes:
         # EXAMPLE
