@@ -76,7 +76,7 @@ def video_feed():
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 def configNT(settings):
-    global heartbeatPub, idPub, labelPub, latencyPub, transPub, boxPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, ntInst
+    global heartbeatPub, idPub, labelPub, latencyPub, transPub, boxPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, camPoseConfPub, ntInst
     ntInst = nt.NetworkTableInstance.getDefault()
     ntInst.startClient4(settings["networktables"]["name"])
     ntInst.setServerTeam(settings["networktables"]["team"])
@@ -96,9 +96,11 @@ def configNT(settings):
     confPub = table.getDoubleArrayTopic("conf").publish() 
     isVisPub = table.getBooleanArrayTopic("is_visible").publish()
     isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
-    camPosePub = table.getStructTopic("cam_pose", geom.Pose3d).publish()
-    camOriginPub = table.getStructTopic("cam_pose_origin", geom.Pose3d).publish()
-    camPoseLatencyPub = table.getDoubleTopic("cam_pose_latency").publish()
+    camPoseTable = mainTable.getSubTable("pose")
+    camPosePub = camPoseTable.getStructTopic("cam_pose", geom.Pose3d).publish()
+    camOriginPub = camPoseTable.getStructTopic("cam_pose_origin", geom.Pose3d).publish()
+    camPoseLatencyPub = camPoseTable.getDoubleTopic("cam_pose_latency").publish()
+    camPoseConfPub = camPoseTable.getDoubleTopic("cam_pose_conf").publish()
 
 def main():
     global exit_signal, global_image, flask_thread, fps
@@ -496,6 +498,7 @@ def publishNT(camera, cam_w_pose, objects, classes):
     ntHeartbeat+=1
     latencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - objects.timestamp.get_nanoseconds())
     camPoseLatencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - cam_w_pose.timestamp.get_nanoseconds())
+    camPoseConfPub.set(cam_w_pose.pose_confidence / 100.0) 
 
     objList = objects.object_list
     for obj in objList:
