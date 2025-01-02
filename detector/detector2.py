@@ -4,17 +4,12 @@ import sys
 import threading
 import numpy as np
 
-# avoid connection errors from yolo analytics connecting to github
-import os
-os.environ['YOLO_OFFLINE']='true'
-
 import argparse
 
 import yaml
 import torch
 import cv2
 import pyzed.sl as sl
-from ultralytics import YOLO
 
 from threading import Lock, Thread
 from time import sleep
@@ -294,6 +289,26 @@ def main():
         exit_signal = True
         zed.close()
         # zed.disable_recording()
+
+def startObjectDetectionFromYaml(inferenceSettingsPath, zed):
+    inferenceConfig = yaml.full_load(open(inferenceSettingsPath))
+    obj_param = sl.ObjectDetectionParameters()
+    obj_param.detection_model = sl.OBJECT_DETECTION_MODEL.CUSTOM_YOLOLIKE_BOX_OBJECTS
+    obj_param.custom_onnx_file = inferenceConfig["weights"]
+    obj_param.custom_onnx_dynamic_input_shape = sl.Resolution(inferenceConfig["input_shape"]["horizontal"],inferenceConfig["input_shape"]["horizontal"])
+    obj_param.enable_tracking = True
+    obj_param.filtering_mode = sl.OBJECT_FILTERING_MODE.NMS3D
+    zed.enable_object_detection(obj_param)
+    
+def filteringModeFromString(string):
+    string = string.upper()
+    if (string == "NMS3D"):
+        return sl.OBJECT_FILTERING_MODE.NMS3D
+    elif (string == "NMS3D_PER_CLASS"):
+        return sl.OBJECT_FILTERING_MODE.NMS3D_PER_CLASS
+    else:
+        return sl.OBJECT_FILTERING_MODE.NONE
+
 
 def slPoseToWPILib(slPose):
     rotVec = slPose.get_rotation_vector()
