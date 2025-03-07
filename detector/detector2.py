@@ -200,7 +200,7 @@ def main():
         point_cloud_res = sl.Resolution(min(camera_res.width, 720), min(camera_res.height, 404))
         point_cloud_render = sl.Mat()
         viewer = gl.GLViewer()
-        viewer.init(camera_infos.camera_model, point_cloud_res, obj_param.enable_tracking)
+        viewer.init(camera_infos.camera_model, point_cloud_res, objPeram.enable_tracking)
         point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
         
     if (viz_ocv_backend):
