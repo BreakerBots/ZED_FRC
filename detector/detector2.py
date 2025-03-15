@@ -7,7 +7,7 @@ import numpy as np
 import argparse
 
 import yaml
-import torch
+# import torch
 import cv2
 import pyzed.sl as sl
 
@@ -223,7 +223,7 @@ def main():
         while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
                
-                zed.retrieve_objects(objects, rtPerams)
+                zed.retrieve_objects(objects, rtPerams, 0)
 
                 if (viz_ocv_disp or publish):
                     zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
@@ -301,21 +301,23 @@ def startObjectDetectionFromYaml(inferenceSettingsPath, zed):
     obj_param.max_range = defaultIfNotValue(inferenceConfig["global_defaults"]["max_tracking_dist"], lambda x : x == 0 or x < 0, 10)
     zed.enable_object_detection(obj_param)
     
-    defaultDetConf = inferenceConfig["global_defaults"]["max_tracking_dist"] * 100
+    defaultDetConf = inferenceConfig["global_defaults"]["conf_thresh"] * 100
     defaultProps = sl.CustomObjectDetectionProperties()
     defaultProps.detection_confidence_threshold = defaultDetConf
     defaultProps.tracking_timeout = obj_param.prediction_timeout_s
     defaultProps.tracking_max_dist =  obj_param.max_range
 
     classes = inferenceConfig["classes"]
-    props = []
+    # props = []
+    props = {}
     for x in range(0,len(classes)):
-        props.append(customObjectDetectionPropertiesFromConfig(classes[x], defaultProps))
+        # props.append(customObjectDetectionPropertiesFromConfig(classes[x], defaultProps))
+        props[x] = customObjectDetectionPropertiesFromConfig(classes[x], defaultProps)
 
-    rtPerams = sl.CustomObjectDetectionRuntimeParameters()
+    rtPerams = sl.CustomObjectDetectionRuntimeParameters(defaultProps, props)
 
-    rtPerams.object_detection_properties = defaultProps
-    rtPerams.object_class_detection_properties = props
+    # rtPerams.object_detection_properties = defaultProps
+    # rtPerams.object_class_detection_properties = props
 
     zed.enable_object_detection(obj_param)
 
@@ -536,8 +538,9 @@ def publishNT(camera, cam_w_pose, objects, classes):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings', type=str, default="settings.yaml", help='settings.yaml path')
-    parser.add_argument('--svo', type=str, default="svorecord.svo2", help='optional svo file')#svorecord.svo2
+    parser.add_argument('--svo', type=str, default=None, help='optional svo file')#svorecord.svo2
     opt = parser.parse_args()
 
-    with torch.no_grad():
-        main()
+    # with torch.no_grad():
+    #     main()
+    main()
