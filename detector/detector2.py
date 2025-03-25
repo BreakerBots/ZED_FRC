@@ -223,7 +223,7 @@ def main():
         while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
                
-                zed.retrieve_objects(objects, rtPerams, 0)
+                zed.retrieve_custom_objects(objects, rtPerams, 0)
 
                 if (viz_ocv_disp or publish):
                     zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)

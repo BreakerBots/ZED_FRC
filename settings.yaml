@@ -1,12 +1,12 @@
 
 general:
-    visualize: true # (true, false) Weather or not the local visuilization GUI shoud run to display detections and the real time depth map
+    visualize: false # (true, false) Weather or not the local visuilization GUI shoud run to display detections and the real time depth map
     camera_config: "ZED2_camera_settings.yaml" # (File Path) The file path to the camera config yaml which contains the approprate camera video settings
     inference_config: "models/2025/yolov8s.yaml" # (File Path) The file path to the inference config yaml which contains the settings for the YOLO object detector runtime
 
 # All settings related to the ZED's stereo depth functionality
 depth: 
-    mode: PERFORMANCE # (PERFORMANCE, QUALITY, ULTRA, NEURAL, NEURAL_PLUS) The method used for stero depth extraction, listed in assending qulity and resource demand
+    mode: NEURAL_LIGHT # (NEURAL_LIGHT, NEURAL, NEURAL_PLUS) The method used for stero depth extraction, listed in assending qulity and resource demand
     stabilization: 0 # (0-100) Controls the degree to which a linear filter is applyed to depth data to compensate for measurment oscilations. 0 disables smoothing
     depth_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their confidence. Decreasing this value will remove depth data from both objects edges and low textured areas, to keep only confident depth estimation data. 
     texture_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their texture confidence. Decreasing this value will remove depth data from image areas which are uniform. 
@@ -30,7 +30,7 @@ localization:
 
 visualization:
     desktop:
-        ocv_2d: true # If the 2D OpenCV bounding box and overhead views shoud be shown on the desktop
+        ocv_2d: false # If the 2D OpenCV bounding box and overhead views shoud be shown on the desktop
         point_cloud_3d: false # If the 3D point cloud render and 3D object bounding boxes shoud be shown on the desktop
     webserver:
         enable: true # If the flask webserver which livestream's the OpenCV visulization to the configured host and port shoud run
