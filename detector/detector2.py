@@ -88,9 +88,9 @@ def configNT(settings):
     idPub = table.getIntegerArrayTopic("id").publish()
     labelPub = table.getStringArrayTopic("label").publish()
     latencyPub = table.getIntegerTopic("pipeline_latency").publish()
-    #xVelPub = table.getDoubleArrayTopic("x_vel").publish()
-    #yVelPub = table.getDoubleArrayTopic("y_vel").publish() 
-    #zVelPub = table.getDoubleArrayTopic("z_vel").publish()
+    # xVelPub = table.getDoubleArrayTopic("x_vel").publish()
+    # yVelPub = table.getDoubleArrayTopic("y_vel").publish() 
+    # zVelPub = table.getDoubleArrayTopic("z_vel").publish()
     transPub = table.getStructArrayTopic("translation", geom.Translation3d).publish()
     boxPub = table.getStructArrayTopic("box", geom.Translation3d).publish()
     confPub = table.getDoubleArrayTopic("conf").publish() 
@@ -223,8 +223,7 @@ def main():
         while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
                
-                # disable object detection
-                #zed.retrieve_custom_objects(objects, rtPerams, 0)
+                zed.retrieve_custom_objects(objects, rtPerams, 0)
 
                 if (viz_ocv_disp or publish):
                     zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
@@ -300,7 +299,7 @@ def startObjectDetectionFromYaml(inferenceSettingsPath, zed):
     obj_param.filtering_mode = filteringModeFromString(inferenceConfig["filter_type"])
     obj_param.prediction_timeout_s = defaultIfNotValue(inferenceConfig["global_defaults"]["tracking_timeout"], lambda x : x < 0, 0.2)
     obj_param.max_range = defaultIfNotValue(inferenceConfig["global_defaults"]["max_tracking_dist"], lambda x : x == 0 or x < 0, 10)
-    #zed.enable_object_detection(obj_param)
+    zed.enable_object_detection(obj_param)
     
     defaultDetConf = inferenceConfig["global_defaults"]["conf_thresh"] * 100
     defaultProps = sl.CustomObjectDetectionProperties()
@@ -320,7 +319,7 @@ def startObjectDetectionFromYaml(inferenceSettingsPath, zed):
     # rtPerams.object_detection_properties = defaultProps
     # rtPerams.object_class_detection_properties = props
 
-    #zed.enable_object_detection(obj_param)
+    zed.enable_object_detection(obj_param)
 
     return (obj_param, rtPerams, classes)
 
@@ -398,8 +397,6 @@ def colorSpaceConversionFromString(string):
     
 def depthModeFromString(string):
     string = string.upper()
-    if (string == "NEURAL_LIGHT"):
-        return sl.DEPTH_MODE.NEURAL_LIGHT
     if (string == "NEURAL"):
         return sl.DEPTH_MODE.NEURAL
     elif (string == "NEURAL_PLUS"):
@@ -487,35 +484,54 @@ def setCameraVideoSettingsZEDX(camera, settings):
     return
 
 def publishNT(camera, cam_w_pose, objects, classes):
-    global camPosePub
-    global heartbeatPub
-    global ntHeartbeat
-    global ntInst
-    global wpiPose
-    # xVelArr
-    # yVelArr
-    # zVelArr
+    global heartbeatPub, ntHeartbeat
+    transArr = []
+    # xVelArr = []
+    # yVelArr = []
+    # zVelArr = []
+    idArr = []
+    labelArr = []
+    boxArr = []
+    confArr = []
+    isVisArr = []
+    isMovArr = []
 
     heartbeatPub.set(ntHeartbeat)
     ntHeartbeat+=1
-    #latencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - objects.timestamp.get_nanoseconds())
-    #camPoseLatencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - cam_w_pose.timestamp.get_nanoseconds())
-    #camPoseConfPub.set(cam_w_pose.pose_confidence / 100.0) 
+    latencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - objects.timestamp.get_nanoseconds())
+    camPoseLatencyPub.set(camera.get_timestamp(sl.TIME_REFERENCE.CURRENT).get_nanoseconds() - cam_w_pose.timestamp.get_nanoseconds())
+    camPoseConfPub.set(cam_w_pose.pose_confidence / 100.0) 
 
-    #labelPub.set(labelArr)
-    #idPub.set(idArr)
-    #confPub.set(confArr)
-    #isVisPub.set(isVisArr)
-    #isMovingPub.set(isMovArr)
-    #transPub.set(transArr)
+    objList = objects.object_list
+    for obj in objList:
+        idArr.append(obj.id)
+        confArr.append(obj.confidence/100.0)
+        isVisArr.append(obj.tracking_state == sl.OBJECT_TRACKING_STATE.OK)
+        isMovArr.append(obj.action_state == sl.OBJECT_ACTION_STATE.MOVING)
+        labelArr.append(classes[obj.raw_label]["label"])
+        pos = obj.position
+        transArr.append(geom.Translation3d(-pos[2], -pos[0], pos[1]))
+        # vel = obj.velocity
+        # xVelArr.append(vel[0])
+        # yVelArr.append(vel[1])
+        # zVelArr.append(vel[2])
+        dims = obj.dimensions
+        boxArr.append(geom.Translation3d(dims[0], dims[2], dims[1]))
+
+    labelPub.set(labelArr)
+    idPub.set(idArr)
+    confPub.set(confArr)
+    isVisPub.set(isVisArr)
+    isMovingPub.set(isMovArr)
+    transPub.set(transArr)
     # xVelPub.set(xVelArr)
     # yVelPub.set(yVelArr)
     # zVelPub.set(zVelArr)
-    #boxPub.set(boxArr)
+    boxPub.set(boxArr)
+    ntInst.flush()
     wpiPose = slPoseToWPILib(cam_w_pose)
     camPosePub.set(wpiPose)
     # camOriginPub.set()
-    ntInst.flush()
     return
 
 
