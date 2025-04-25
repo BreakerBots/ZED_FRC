@@ -258,12 +258,12 @@ def main():
                     
 
                 fps = zed.get_current_fps()
-                print("fps: " + str(int(fps)))
+                #print("fps: " + str(int(fps)))
                 
             
-                key = cv2.waitKey(10)
-                if key == 27:
-                    exit_signal = True
+                #key = cv2.waitKey(10)
+                #if key == 27:
+                #    exit_signal = True
             else:
                 exit_signal = True
 
@@ -492,9 +492,9 @@ def publishNT(camera, cam_w_pose, objects, classes):
     global ntInst
     global wpiPose
     transArr = []
-    xVelArr = []
-    yVelArr = []
-    zVelArr = []
+    #xVelArr = []
+    #yVelArr = []
+    #zVelArr = []
     idArr = []
     labelArr = []
     boxArr = []
@@ -518,9 +518,9 @@ def publishNT(camera, cam_w_pose, objects, classes):
         pos = obj.position
         transArr.append(geom.Translation3d(-pos[2], -pos[0], pos[1]))
         vel = obj.velocity
-        xVelArr.append(vel[0])
-        yVelArr.append(vel[1])
-        zVelArr.append(vel[2])
+        #xVelArr.append(vel[0])
+        #yVelArr.append(vel[1])
+        #zVelArr.append(vel[2])
         dims = obj.dimensions
         boxArr.append(geom.Translation3d(dims[0], dims[2], dims[1]))
 
@@ -530,9 +530,9 @@ def publishNT(camera, cam_w_pose, objects, classes):
     isVisPub.set(isVisArr)
     isMovingPub.set(isMovArr)
     transPub.set(transArr)
-    xVelPub.set(xVelArr)
-    yVelPub.set(yVelArr)
-    zVelPub.set(zVelArr)
+    #xVelPub.set(xVelArr)
+    #yVelPub.set(yVelArr)
+    #zVelPub.set(zVelArr)
     boxPub.set(boxArr)
     wpiPose = slPoseToWPILib(cam_w_pose)
     camPosePub.set(wpiPose)

@@ -1,6 +1,6 @@
 model: ZED2
-resolution: "VGA"
-fps: -1
+resolution: "HD720"
+fps: 60
 brightness: 4
 contrast: 4
 hue: 0
