@@ -123,7 +123,7 @@ def main():
     viz_ogl = settings["visualization"]["desktop"]["point_cloud_3d"]
     viz_ocv_disp = settings["visualization"]["desktop"]["ocv_2d"]
     viz_webserver = settings["visualization"]["webserver"]["enable"]
-    viz_ocv_backend = viz_ocv_disp or viz_webserver
+    viz_ocv_backend = viz_ocv_disp or settings["visualization"]["webserver"]["ocv_backend"]
     
     if (viz_webserver):
          # Start Flask app in a separate thread
@@ -203,10 +203,11 @@ def main():
         viewer.init(camera_infos.camera_model, point_cloud_res, objPeram.enable_tracking)
         point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
         
-    if (viz_ocv_backend):
-        # Utilities for 2D display
+    if (viz_ocv_backend or viz_webserver):
         image_left = sl.Mat()
         display_resolution = sl.Resolution(min(camera_res.width, 1280), min(camera_res.height, 720))
+    if (viz_ocv_backend):
+        # Utilities for 2D display
         image_scale = [display_resolution.width / camera_res.width, display_resolution.height / camera_res.height]
         image_left_ocv = np.full((display_resolution.height, display_resolution.width, 4), [245, 239, 239, 255], np.uint8)
 
@@ -245,7 +246,7 @@ def main():
                 if (viz_ocv_backend):
                     zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
                     # 2D rendering
-                    np.copyto(image_left_ocv, image_left.get_data())
+                    image_left_ocv = image_left.get_data() # TODO: test to make sure eliminating this copy doesn't mess up object detection
                     cv_viewer.render_2D(image_left_ocv, image_scale, objects, objPeram.enable_tracking, classes)
     
                     global_image = cv2.hconcat([image_left_ocv, image_track_ocv])
@@ -255,6 +256,9 @@ def main():
 
                     if (viz_ocv_disp):
                         cv2.imshow("ZED | 2D View and Birds View", global_image)
+                elif (viz_webserver):
+                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
+                    global_image = image_left.get_data()[:,:,0:3] # TODO: this is the right shape, but maybe not the right subpixels?
                     
 
                 fps = zed.get_current_fps()
