@@ -1,0 +1,48 @@
+weights: "models/2024/other/dataset_colab_noro2024_YOLOv8n_last.onnx" #"models/2024/frc2024no_YOLOv10n/lb1o8E_100.pt" # File path to the YOLOv8, YOLOv9, or YOLOv10 .pt weights
+input_shape:  # The horizontal and verticle size of the model's expected image input in pixels
+  horizontal: 640
+  vertical: 640
+filter_type: "NMS3D"
+
+global_defaults:
+  conf_thresh: 0.4
+  tracking_timeout: -1.0
+  max_tracking_dist: -1.0
+  
+classes:
+        # EXAMPLE
+        # 0: <- The number of this class in the models raw output
+        #   label: foo <- The lable or name of the class
+        #   conf_thresh: 0.0 <- An additional confidnce thresh for this class to accomidate classes with poorer detection perfomance (a value lower then 'det_conf_thresh' does nothing)
+        
+        0:
+            label: algae
+            enabled: true
+            conf_thresh: 0.5
+            is_grounded: true
+            is_static: false
+            tracking_timeout: -1.0
+            max_tracking_dist: -1.0
+            max_box_norm:
+              width: -1
+              height: -1
+            min_box_norm:
+              width: -1
+              height: -1
+        1:
+            label: coral
+            enabled: true
+            conf_thresh: 0.5
+            is_grounded: true
+            is_static: false
+            tracking_timeout: -1.0
+            max_tracking_dist: -1.0
+            max_box_norm:
+              width: -1
+              height: -1
+            min_box_norm:
+              width: -1
+              height: -1
+              
+            
+
