@@ -6,7 +6,7 @@ general:
 
 # All settings related to the ZED's stereo depth functionality
 depth: 
-    mode: NEURAL_LIGHT # (NEURAL_LIGHT, NEURAL, NEURAL_PLUS) The method used for stero depth extraction, listed in assending qulity and resource demand
+    mode: "NEURAL_LIGHT" # (NEURAL_LIGHT, NEURAL, NEURAL_PLUS) The method used for stero depth extraction, listed in assending qulity and resource demand
     stabilization: 0 # (0-100) Controls the degree to which a linear filter is applyed to depth data to compensate for measurment oscilations. 0 disables smoothing
     depth_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their confidence. Decreasing this value will remove depth data from both objects edges and low textured areas, to keep only confident depth estimation data. 
     texture_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their texture confidence. Decreasing this value will remove depth data from image areas which are uniform. 
@@ -22,11 +22,11 @@ networktables:
 
 # All settings related to the ZED's VIO/SLAM abilities
 localization:
-    area_memory: true # If the ZED shoud map its suroundings during operation to improve localization accuracy, slight perfomance hit
+    area_memory: false # If the ZED shoud map its suroundings during operation to improve localization accuracy, slight perfomance hit
     pose_smoothing: true # If the ZED shoud smooth out the sudden pose change caused by loop closure when in SLAM mode
     use_gravity_origin: true # If the ZED should use the direction of gravity to estimate its angle relitive to the ground, only effects world reletive values like pose
     min_depth: -1 # The minimum depth of pixles to be used in VIO caclulations, helps ignore fixed obstructuions in your view frame like robot parts
-    mode: GEN3 # (GEN1, GEN2) The type of pose estimation to be used, GEN2 performs better but has more of a performance demand
+    mode: "GEN1" # (GEN1, GEN2) The type of pose estimation to be used, GEN2 performs better but has more of a performance demand
 
 visualization:
     desktop:

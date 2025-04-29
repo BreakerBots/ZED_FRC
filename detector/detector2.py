@@ -144,7 +144,7 @@ def main():
     init_params.depth_mode = depthModeFromString(settings["depth"]["mode"])
     init_params.camera_resolution = resolutionFromString(cameraSettings["resolution"], cameraType)
     init_params.camera_fps = cameraSettings["fps"]
-    init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP #sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
+    init_params.coordinate_system = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
     init_params.depth_maximum_distance = settings["depth"]["max_dist"]
     init_params.depth_minimum_distance = settings["depth"]["min_dist"]
     init_params.depth_stabilization = settings["depth"]["stabilization"]
@@ -522,7 +522,7 @@ def publishNT(camera, cam_w_pose, objects, classes):
         isMovArr.append(obj.action_state == sl.OBJECT_ACTION_STATE.MOVING)
         labelArr.append(classes[obj.raw_label]["label"])
         pos = obj.position
-        transArr.append(geom.Translation3d(-pos[2], -pos[0], pos[1]))
+        transArr.append(geom.Translation3d(-pos[0], -pos[1], pos[2]))
         vel = obj.velocity
         #xVelArr.append(vel[0])
         #yVelArr.append(vel[1])
