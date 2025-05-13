@@ -76,7 +76,7 @@ def video_feed():
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 def configNT(settings):
-    global heartbeatPub, idPub, labelPub, latencyPub, transPub, boxPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, camPoseConfPub, ntInst
+    global heartbeatPub, idPub, labelPub, latencyPub, transPub, boxPub, rotPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, camPoseConfPub, ntInst
     ntInst = nt.NetworkTableInstance.getDefault()
     ntInst.startClient4(settings["networktables"]["name"])
     ntInst.setServerTeam(settings["networktables"]["team"])
@@ -93,6 +93,7 @@ def configNT(settings):
     #zVelPub = table.getDoubleArrayTopic("z_vel").publish()
     transPub = table.getStructArrayTopic("translation", geom.Translation3d).publish()
     boxPub = table.getStructArrayTopic("box", geom.Translation3d).publish()
+    rotPub = table.getDoubleArrayTopic("rotation").publish()
     confPub = table.getDoubleArrayTopic("conf").publish() 
     isVisPub = table.getBooleanArrayTopic("is_visible").publish()
     isMovingPub = table.getBooleanArrayTopic("is_moving").publish()
@@ -225,6 +226,8 @@ def main():
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
                
                 zed.retrieve_custom_objects(objects, rtPerams, 0)
+                for obj in objects:
+                    obj.rotation = 0.0
 
                 if (viz_ocv_disp or publish):
                     zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
@@ -507,6 +510,7 @@ def publishNT(camera, cam_w_pose, objects, classes):
     confArr = []
     isVisArr = []
     isMovArr = []
+    rotArr = []
 
     heartbeatPub.set(ntHeartbeat)
     ntHeartbeat+=1
@@ -529,6 +533,7 @@ def publishNT(camera, cam_w_pose, objects, classes):
         #zVelArr.append(vel[2])
         dims = obj.dimensions
         boxArr.append(geom.Translation3d(dims[0], dims[2], dims[1]))
+        rotArr.append(obj.rotation)
 
     labelPub.set(labelArr)
     idPub.set(idArr)
@@ -540,6 +545,7 @@ def publishNT(camera, cam_w_pose, objects, classes):
     #yVelPub.set(yVelArr)
     #zVelPub.set(zVelArr)
     boxPub.set(boxArr)
+    rotPub.set(rotArr)
     wpiPose = slPoseToWPILib(cam_w_pose)
     camPosePub.set(wpiPose)
     # camOriginPub.set()
