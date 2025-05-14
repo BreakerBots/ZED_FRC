@@ -103,6 +103,12 @@ def configNT(settings):
     camPoseLatencyPub = camPoseTable.getDoubleTopic("cam_pose_latency").publish()
     camPoseConfPub = camPoseTable.getDoubleTopic("cam_pose_conf").publish()
 
+def get_rotation_from_depth(obj, depth_map):
+    bb = obj.bounding_box_2d
+    print(bb)
+    print(depth_map[bb[0][0]], depth_map[bb[0][1]], depth_map[bb[1][0]], depth_map[bb[1][1]])
+    return 0.0
+
 def main():
     global exit_signal, global_image, flask_thread, fps
     fps = 0.0
@@ -231,6 +237,7 @@ def main():
         image_track_ocv = np.zeros((tracks_resolution.height, tracks_resolution.width, 4), np.uint8)
     # Camera pose
     cam_w_pose = sl.Pose()
+    depth_map = sl.Mat()
     try:
         while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
@@ -243,6 +250,9 @@ def main():
 
 
                 if (publish):
+                    zed.retrieveMeasure(depth_map, sl.MEASURE.DEPTH)
+                    for obj in objects.object_list:
+                        obj.rotation = get_rotation_from_depth(obj, depth_map)
                     publishNT(zed, cam_w_pose, objects, classes, rotations)
 
                 if (viz_ogl):
