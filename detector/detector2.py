@@ -2,7 +2,8 @@
 
 import sys
 import threading
-import cupy as np
+import cupy as cp
+import numpy as np
 import math
 
 import argparse
@@ -122,7 +123,7 @@ def get_rotation_from_depth(obj, depth_map):
 
     # get the average depth values for each the four quadrants of the bounding box
     bb_depth = depth_map.get_data(memory_type=sl.MEM.GPU, deep_copy=False)
-    nanmean_ = lambda arr : np.nanmean(np.nan_to_num(arr, False, nan=np.nan, posinf=np.nan, neginf=np.nan))
+    nanmean_ = lambda arr : cp.nanmean(cp.nan_to_num(arr, False, nan=cp.nan, posinf=cp.nan, neginf=cp.nan))
     # for some reason, the ndarray is rotated, i.e. its shape is (720, 180) instead of (1280, 720)
     tla = nanmean_(bb_depth[tl[1]:cy, tl[0]:cx])
     tra = nanmean_(bb_depth[tr[1]:cy, cx:tr[0]])
