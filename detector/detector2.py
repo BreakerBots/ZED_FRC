@@ -153,11 +153,21 @@ def main():
     init_params.camera_disable_self_calib = not cameraSettings["camera_self_calib"]
     init_params.sdk_verbose = 1
 
+    # Enable recording with the filename specified in argument
+    #output_path = "svo2025v1.svo2"
+    #recordingParameters = sl.RecordingParameters()
+    #recordingParameters.compression_mode = sl.SVO_COMPRESSION_MODE.LOSSLESS
+    #recordingParameters.video_filename = output_path
+    
     runtime_params = sl.RuntimeParameters()
     runtime_params.confidence_threshold = settings['depth']["depth_conf_thresh"]
     runtime_params.texture_confidence_threshold = settings['depth']["texture_conf_thresh"]
     runtime_params.remove_saturated_areas = settings['depth']["remove_saturated_areas"]
+    
     status = zed.open(init_params)
+    #err = zed.enable_recording(recordingParameters)
+
+
 
     if status != sl.ERROR_CODE.SUCCESS:
         print(repr(status))
@@ -280,7 +290,7 @@ def main():
             flask_thread.shutdown()
         exit_signal = True
         zed.close()
-        # zed.disable_recording()
+        #zed.disable_recording()
     except KeyboardInterrupt:
         if (viz_ogl):
             viewer.exit()
