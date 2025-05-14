@@ -10,7 +10,7 @@ depth:
     stabilization: 0 # (0-100) Controls the degree to which a linear filter is applyed to depth data to compensate for measurment oscilations. 0 disables smoothing
     depth_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their confidence. Decreasing this value will remove depth data from both objects edges and low textured areas, to keep only confident depth estimation data. 
     texture_conf_thresh: 100 # (1-100) Threshold to reject depth values based on their texture confidence. Decreasing this value will remove depth data from image areas which are uniform. 
-    remove_saturated_areas: true # Weather or not areas with a saturaton of 255 should be removed from depth calculations due to a lack of any detail
+    remove_saturated_areas: false # Weather or not areas with a saturaton of 255 should be removed from depth calculations due to a lack of any detail
     max_dist: 20.0 #The maximum distance the ZED will calculate depth data for
     min_dist: -1 #The minimum distance the ZED will calculate depth data for, -1 set this value to the default
 

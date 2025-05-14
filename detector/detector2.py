@@ -2,7 +2,8 @@
 
 import sys
 import threading
-import numpy as np
+import cupy as np
+import math
 
 import argparse
 
@@ -105,9 +106,48 @@ def configNT(settings):
 
 def get_rotation_from_depth(obj, depth_map):
     bb = obj.bounding_box_2d
-    print(bb)
-    print(depth_map[bb[0][0]], depth_map[bb[0][1]], depth_map[bb[1][0]], depth_map[bb[1][1]])
-    return 0.0
+
+    # bb[i]
+    # 0 1
+    # 3 2
+    # top left, top right, bottom right, bottom left
+    tl = bb[0]
+    tr = bb[1]
+    br = bb[2]
+    bl = bb[3]
+
+    # center of the bounding box
+    cx = int(tl[0] + tr[0]) // 2
+    cy = int(tr[1] + br[1]) // 2
+
+    # get the average depth values for each the four quadrants of the bounding box
+    bb_depth = depth_map.get_data(memory_type=sl.MEM.GPU, deep_copy=False)
+    nanmean_ = lambda arr : np.nanmean(np.nan_to_num(arr, False, nan=np.nan, posinf=np.nan, neginf=np.nan))
+    # for some reason, the ndarray is rotated, i.e. its shape is (720, 180) instead of (1280, 720)
+    tla = nanmean_(bb_depth[tl[1]:cy, tl[0]:cx])
+    tra = nanmean_(bb_depth[tr[1]:cy, cx:tr[0]])
+    bra = nanmean_(bb_depth[cy:br[1], cx:br[0]])
+    bla = nanmean_(bb_depth[cy:bl[1], bl[0]:cx])
+
+    # calculate the sign of rotation (positive is [0, pi/2) radians CCW from horizontal)
+    # if the coral rotation is positive, then the top right and bottom left depth should be less
+    sign = tra + bla <= tla + bra
+
+    # calculate the magnitude of rotation
+    # coral is 11.875" x 4.5"
+    L = 11.875
+    W = 4.5
+    bbw = tr[0] - tl[0]
+    bbh = br[1] - tl[1]
+    num = L * bbh - W * bbw
+    den = L * bbw - W * bbh
+    theta = math.atan2(num, den)
+    if theta < 0:
+        theta = 0.0
+    elif theta >= math.pi / 2:
+        theta = math.nextafter(math.pi / 2, 0.0)
+
+    return theta if sign else -theta
 
 def main():
     global exit_signal, global_image, flask_thread, fps
@@ -218,7 +258,7 @@ def main():
         point_cloud_render = sl.Mat()
         viewer = gl.GLViewer()
         viewer.init(camera_infos.camera_model, point_cloud_res, objPeram.enable_tracking)
-        point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.GPU)
+        point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
         
     if (viz_ocv_backend or viz_webserver):
         image_left = sl.Mat()
@@ -237,7 +277,7 @@ def main():
         image_track_ocv = np.zeros((tracks_resolution.height, tracks_resolution.width, 4), np.uint8)
     # Camera pose
     cam_w_pose = sl.Pose()
-    depth_map = sl.Mat()
+    depth_map = sl.Mat(memory_type=sl.MEM.GPU)
     try:
         while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
@@ -250,15 +290,17 @@ def main():
 
 
                 if (publish):
-                    zed.retrieveMeasure(depth_map, sl.MEASURE.DEPTH)
-                    for obj in objects.object_list:
-                        obj.rotation = get_rotation_from_depth(obj, depth_map)
+                    zed.retrieve_measure(depth_map, sl.MEASURE.DEPTH, sl.MEM.GPU)
+                    for idx, obj in enumerate(objects.object_list):
+                        # only compute orientation for coral
+                        if obj.raw_label == 1:
+                            rotations[idx] = get_rotation_from_depth(obj, depth_map)
                     publishNT(zed, cam_w_pose, objects, classes, rotations)
 
                 if (viz_ogl):
                     # -- Display
                     # Retrieve display data
-                    zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.GPU, point_cloud_res)
+                    zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, point_cloud_res)
                     point_cloud.copy_to(point_cloud_render)
 
                     # 3D rendering
@@ -266,7 +308,7 @@ def main():
 
                     
                 if (viz_ocv_backend):
-                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.GPU, display_resolution)
+                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
                     # 2D rendering
                     image_left_ocv = image_left.get_data() # TODO: test to make sure eliminating this copy doesn't mess up object detection
                     cv_viewer.render_2D(image_left_ocv, image_scale, objects, objPeram.enable_tracking, classes)
@@ -279,12 +321,12 @@ def main():
                     if (viz_ocv_disp):
                         cv2.imshow("ZED | 2D View and Birds View", global_image)
                 elif (viz_webserver):
-                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.GPU, display_resolution)
+                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
                     global_image = image_left.get_data()[:,:,0:3] # TODO: this is the right shape, but maybe not the right subpixels?
                     
 
                 fps = zed.get_current_fps()
-                print("fps: " + str(int(fps)))
+                #print("fps: " + str(int(fps)))
                 
             
                 #key = cv2.waitKey(10)
