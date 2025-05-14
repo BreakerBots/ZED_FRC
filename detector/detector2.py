@@ -21,7 +21,7 @@ import cv_viewer.tracking_viewer as cv_viewer
 import ntcore as nt
 from wpimath import geometry as geom
 from enum import Enum
-from flask import Flask, Response
+from flask import Flask, Response, redirect
 from werkzeug.serving import make_server
 
 # Create Flask app
@@ -32,6 +32,7 @@ run_signal = False
 exit_signal = False
 ntHeartbeat = 0
 global_image = np.zeros((720, 1280, 3), dtype=np.uint8) 
+viz_ocv_backend = True
 
 class CameraType(Enum):
     ZED_X = 1
@@ -77,8 +78,21 @@ def video_feed():
             sleep(0.01)  # Avoid 100% CPU usage
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+# Disable video streaming at runtime
+@app.route('/disable')
+def disable_feed():
+    viz_ocv_backend = False
+    return Response('ok', mimetype='text/plain')
+
+# Enable video streaming at runtime
+@app.route('/enable')
+def enable_feed():
+    global viz_ocv_backend
+    viz_ocv_backend = True
+    return redirect('/', code=302)
+
 def configNT(settings):
-    global heartbeatPub, idPub, labelPub, latencyPub, transPub, boxPub, rotPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, camPoseConfPub, ntInst
+    global heartbeatPub, idPub, labelPub, latencyPub, transPub, boxPub, rotPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, camPoseConfPub, fpsPub, ntInst
     ntInst = nt.NetworkTableInstance.getDefault()
     ntInst.startClient4(settings["networktables"]["name"])
     ntInst.setServerTeam(settings["networktables"]["team"])
@@ -104,6 +118,7 @@ def configNT(settings):
     camOriginPub = camPoseTable.getStructTopic("cam_pose_origin", geom.Pose3d).publish()
     camPoseLatencyPub = camPoseTable.getDoubleTopic("cam_pose_latency").publish()
     camPoseConfPub = camPoseTable.getDoubleTopic("cam_pose_conf").publish()
+    fpsPub = mainTable.getDoubleTopic("fps").publish()
 
 def get_rotation_from_depth(obj, depth_map):
     bb = obj.bounding_box_2d
@@ -122,13 +137,12 @@ def get_rotation_from_depth(obj, depth_map):
     cy = int(tr[1] + br[1]) // 2
 
     # get the average depth values for each the four quadrants of the bounding box
-    bb_depth = depth_map.get_data(memory_type=sl.MEM.GPU, deep_copy=False)
-    nanmean_ = lambda arr : cp.nanmean(cp.nan_to_num(arr, False, nan=cp.nan, posinf=cp.nan, neginf=cp.nan))
+    bb_depth = cp.nan_to_num(depth_map.get_data(memory_type=sl.MEM.GPU, deep_copy=False), False, nan=cp.nan, posinf=cp.nan, neginf=cp.nan)
     # for some reason, the ndarray is rotated, i.e. its shape is (720, 180) instead of (1280, 720)
-    tla = nanmean_(bb_depth[tl[1]:cy, tl[0]:cx])
-    tra = nanmean_(bb_depth[tr[1]:cy, cx:tr[0]])
-    bra = nanmean_(bb_depth[cy:br[1], cx:br[0]])
-    bla = nanmean_(bb_depth[cy:bl[1], bl[0]:cx])
+    tla = cp.nanmean(bb_depth[tl[1]:cy, tl[0]:cx])
+    tra = cp.nanmean(bb_depth[tr[1]:cy, cx:tr[0]])
+    bra = cp.nanmean(bb_depth[cy:br[1], cx:br[0]])
+    bla = cp.nanmean(bb_depth[cy:bl[1], bl[0]:cx])
 
     # calculate the sign of rotation (positive is [0, pi/2) radians CCW from horizontal)
     # if the coral rotation is positive, then the top right and bottom left depth should be less
@@ -152,6 +166,7 @@ def get_rotation_from_depth(obj, depth_map):
 
 def main():
     global exit_signal, global_image, flask_thread, fps
+    global viz_ocv_backend
     fps = 0.0
 
     print("Loading Settings...")
@@ -282,21 +297,22 @@ def main():
     try:
         while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
+                fps = zed.get_current_fps()
                
                 zed.retrieve_custom_objects(objects, rtPerams, 0)
-                rotations = [0.0 for obj in objects.object_list]
 
                 if (viz_ocv_disp or publish):
                     zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
 
 
                 if (publish):
+                    rotations = [0.0 for obj in objects.object_list]
                     zed.retrieve_measure(depth_map, sl.MEASURE.DEPTH, sl.MEM.GPU)
                     for idx, obj in enumerate(objects.object_list):
                         # only compute orientation for coral
                         if obj.raw_label == 1:
                             rotations[idx] = get_rotation_from_depth(obj, depth_map)
-                    publishNT(zed, cam_w_pose, objects, classes, rotations)
+                    publishNT(zed, cam_w_pose, objects, classes, rotations, fps)
 
                 if (viz_ogl):
                     # -- Display
@@ -324,12 +340,7 @@ def main():
                 elif (viz_webserver):
                     zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
                     global_image = image_left.get_data()[:,:,0:3] # TODO: this is the right shape, but maybe not the right subpixels?
-                    
 
-                fps = zed.get_current_fps()
-                #print("fps: " + str(int(fps)))
-                
-            
                 #key = cv2.waitKey(10)
                 #if key == 27:
                 #    exit_signal = True
@@ -557,9 +568,8 @@ def setCameraVideoSettingsZEDX(camera, settings):
         camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE, wb)
     return
 
-def publishNT(camera, cam_w_pose, objects, classes, rotations):
-    global camPosePub
-    global heartbeatPub
+def publishNT(camera, cam_w_pose, objects, classes, rotations, fps):
+    global heartbeatPub, idPub, labelPub, latencyPub, transPub, boxPub, rotPub, confPub, isVisPub, isMovingPub, camPosePub, camOriginPub, camPoseLatencyPub, camPoseConfPub, fpsPub
     global ntHeartbeat
     global ntInst
     global wpiPose
@@ -581,14 +591,14 @@ def publishNT(camera, cam_w_pose, objects, classes, rotations):
     camPoseConfPub.set(cam_w_pose.pose_confidence / 100.0) 
 
     objList = objects.object_list
-    for idx, obj in enumerate(objList):
+    for obj in objList:
         idArr.append(obj.id)
         confArr.append(obj.confidence/100.0)
         isVisArr.append(obj.tracking_state == sl.OBJECT_TRACKING_STATE.OK)
         isMovArr.append(obj.action_state == sl.OBJECT_ACTION_STATE.MOVING)
         labelArr.append(classes[obj.raw_label]["label"])
         pos = obj.position
-        transArr.append(geom.Translation3d(-pos[0], -pos[1], pos[2]))
+        transArr.append(geom.Translation3d(pos[0], pos[1], pos[2]))
         vel = obj.velocity
         #xVelArr.append(vel[0])
         #yVelArr.append(vel[1])
@@ -610,6 +620,7 @@ def publishNT(camera, cam_w_pose, objects, classes, rotations):
     wpiPose = slPoseToWPILib(cam_w_pose)
     camPosePub.set(wpiPose)
     # camOriginPub.set()
+    fpsPub.set(fps)
     ntInst.flush()
     return
 
