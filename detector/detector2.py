@@ -212,7 +212,7 @@ def main():
         point_cloud_render = sl.Mat()
         viewer = gl.GLViewer()
         viewer.init(camera_infos.camera_model, point_cloud_res, objPeram.enable_tracking)
-        point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
+        point_cloud = sl.Mat(point_cloud_res.width, point_cloud_res.height, sl.MAT_TYPE.F32_C4, sl.MEM.GPU)
         
     if (viz_ocv_backend or viz_webserver):
         image_left = sl.Mat()
@@ -249,7 +249,7 @@ def main():
                 if (viz_ogl):
                     # -- Display
                     # Retrieve display data
-                    zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.CPU, point_cloud_res)
+                    zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA, sl.MEM.GPU, point_cloud_res)
                     point_cloud.copy_to(point_cloud_render)
 
                     # 3D rendering
@@ -257,7 +257,7 @@ def main():
 
                     
                 if (viz_ocv_backend):
-                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
+                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.GPU, display_resolution)
                     # 2D rendering
                     image_left_ocv = image_left.get_data() # TODO: test to make sure eliminating this copy doesn't mess up object detection
                     cv_viewer.render_2D(image_left_ocv, image_scale, objects, objPeram.enable_tracking, classes)
@@ -270,12 +270,12 @@ def main():
                     if (viz_ocv_disp):
                         cv2.imshow("ZED | 2D View and Birds View", global_image)
                 elif (viz_webserver):
-                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
+                    zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.GPU, display_resolution)
                     global_image = image_left.get_data()[:,:,0:3] # TODO: this is the right shape, but maybe not the right subpixels?
                     
 
                 fps = zed.get_current_fps()
-                #print("fps: " + str(int(fps)))
+                print("fps: " + str(int(fps)))
                 
             
                 #key = cv2.waitKey(10)
@@ -313,6 +313,7 @@ def startObjectDetectionFromYaml(inferenceSettingsPath, zed):
     obj_param.custom_onnx_file = inferenceConfig["weights"]
     obj_param.custom_onnx_dynamic_input_shape = sl.Resolution(inferenceConfig["input_shape"]["horizontal"],inferenceConfig["input_shape"]["vertical"])
     obj_param.enable_tracking = True
+    obj_param.allow_reduced_precision_inference = True
     obj_param.filtering_mode = filteringModeFromString(inferenceConfig["filter_type"])
     obj_param.prediction_timeout_s = defaultIfNotValue(inferenceConfig["global_defaults"]["tracking_timeout"], lambda x : x < 0, 0.2)
     obj_param.max_range = defaultIfNotValue(inferenceConfig["global_defaults"]["max_tracking_dist"], lambda x : x == 0 or x < 0, 10)
