@@ -66,7 +66,7 @@ def stop_server():
 @app.route('/')
 def video_feed():
     def generate():
-        while not exit_signal:
+        while viz_ocv_backend and not exit_signal:
             # Capture the image and encode it in JPEG format
             # lock.acquire()
             ret, jpeg = cv2.imencode('.jpg', global_image)
@@ -81,8 +81,9 @@ def video_feed():
 # Disable video streaming at runtime
 @app.route('/disable')
 def disable_feed():
+    global viz_ocv_backend
     viz_ocv_backend = False
-    return Response('ok', mimetype='text/plain')
+    return redirect('/', code=302)
 
 # Enable video streaming at runtime
 @app.route('/enable')
@@ -295,6 +296,7 @@ def main():
     cam_w_pose = sl.Pose()
     depth_map = sl.Mat(memory_type=sl.MEM.GPU)
     try:
+        viz_ocv_backend = False
         while ((not viz_ocv_backend) or (not viz_ogl) or viewer.is_available()) and not exit_signal:
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
                 fps = zed.get_current_fps()
@@ -337,7 +339,7 @@ def main():
 
                     if (viz_ocv_disp):
                         cv2.imshow("ZED | 2D View and Birds View", global_image)
-                elif (viz_webserver):
+                elif (viz_webserver and viz_ocv_backend):
                     zed.retrieve_image(image_left, sl.VIEW.LEFT, sl.MEM.CPU, display_resolution)
                     global_image = image_left.get_data()[:,:,0:3] # TODO: this is the right shape, but maybe not the right subpixels?
 
