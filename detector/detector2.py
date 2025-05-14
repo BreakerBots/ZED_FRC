@@ -236,15 +236,14 @@ def main():
             if zed.grab(runtime_params) == sl.ERROR_CODE.SUCCESS:
                
                 zed.retrieve_custom_objects(objects, rtPerams, 0)
-                for obj in objects:
-                    obj.rotation = 0.0
+                rotations = [0.0 for obj in objects.object_list]
 
                 if (viz_ocv_disp or publish):
                     zed.get_position(cam_w_pose, sl.REFERENCE_FRAME.WORLD)
 
 
                 if (publish):
-                    publishNT(zed, cam_w_pose, objects, classes)
+                    publishNT(zed, cam_w_pose, objects, classes, rotations)
 
                 if (viz_ogl):
                     # -- Display
@@ -505,7 +504,7 @@ def setCameraVideoSettingsZEDX(camera, settings):
         camera.set_camera_settings(sl.VIDEO_SETTINGS.WHITEBALANCE_TEMPERATURE, wb)
     return
 
-def publishNT(camera, cam_w_pose, objects, classes):
+def publishNT(camera, cam_w_pose, objects, classes, rotations):
     global camPosePub
     global heartbeatPub
     global ntHeartbeat
@@ -521,7 +520,6 @@ def publishNT(camera, cam_w_pose, objects, classes):
     confArr = []
     isVisArr = []
     isMovArr = []
-    rotArr = []
 
     heartbeatPub.set(ntHeartbeat)
     ntHeartbeat+=1
@@ -530,7 +528,7 @@ def publishNT(camera, cam_w_pose, objects, classes):
     camPoseConfPub.set(cam_w_pose.pose_confidence / 100.0) 
 
     objList = objects.object_list
-    for obj in objList:
+    for idx, obj in enumerate(objList):
         idArr.append(obj.id)
         confArr.append(obj.confidence/100.0)
         isVisArr.append(obj.tracking_state == sl.OBJECT_TRACKING_STATE.OK)
@@ -544,7 +542,6 @@ def publishNT(camera, cam_w_pose, objects, classes):
         #zVelArr.append(vel[2])
         dims = obj.dimensions
         boxArr.append(geom.Translation3d(dims[0], dims[2], dims[1]))
-        rotArr.append(obj.rotation)
 
     labelPub.set(labelArr)
     idPub.set(idArr)
@@ -556,7 +553,7 @@ def publishNT(camera, cam_w_pose, objects, classes):
     #yVelPub.set(yVelArr)
     #zVelPub.set(zVelArr)
     boxPub.set(boxArr)
-    rotPub.set(rotArr)
+    rotPub.set(rotations)
     wpiPose = slPoseToWPILib(cam_w_pose)
     camPosePub.set(wpiPose)
     # camOriginPub.set()
